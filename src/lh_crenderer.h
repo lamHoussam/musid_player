@@ -2,9 +2,11 @@
 #define LH_CONSOLE_RENDERER
 
 #include <windows.h>
+#include <stdio.h>
 
 #define HEIGHT  50
 #define WIDTH   200
+#define LH_KEYS_COUNT   0x1 << 16
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,10 +30,18 @@ struct ConsoleRect {
     int right;
 };
 
+struct InputState {
+    int         keys[LH_KEYS_COUNT];
+    int         mouseX, mouseY;
+    int         mouseDX, mouseDY;
+};
+
 struct ConsoleRenderer {
-    HANDLE hBuffer;
-    Cell backBuffer[HEIGHT*WIDTH];
-    CHAR_INFO winBuffer[HEIGHT*WIDTH];
+    Cell        backBuffer[HEIGHT*WIDTH];
+    CHAR_INFO   winBuffer[HEIGHT*WIDTH];
+    InputState  input;
+    HANDLE      hBuffer;
+    HANDLE      hInput;
 };
 
 MYLIB_API bool console_init(ConsoleRenderer* r);
@@ -42,6 +52,7 @@ MYLIB_API void console_render(ConsoleRenderer* console);
 
 MYLIB_API void console_draw_rectangle(ConsoleRenderer* console, const ConsoleRect rc);
 MYLIB_API void console_write_text(ConsoleRenderer* console, int x, int y, const wchar_t* ch, int size);
+MYLIB_API void console_process_input(ConsoleRenderer* console);
 
 #ifdef __cplusplus
 }

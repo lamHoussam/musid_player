@@ -3,6 +3,10 @@
 #include "lh_crenderer.h"
 
 
+void input_state_init(InputState* input) {
+    for (int i = 0; i < LH_KEYS_COUNT; ++i) { input->keys[i] = 0; }
+}
+
 bool console_init(ConsoleRenderer* r) {
     r->hBuffer = CreateConsoleScreenBuffer(
         GENERIC_READ | GENERIC_WRITE,
@@ -14,6 +18,18 @@ bool console_init(ConsoleRenderer* r) {
 
     if (r->hBuffer == INVALID_HANDLE_VALUE)
         return false;
+
+    r->hInput = GetStdHandle(STD_INPUT_HANDLE);
+
+    DWORD mode = 0;
+    GetConsoleMode(r->hInput, &mode);
+
+    mode |= ENABLE_EXTENDED_FLAGS;
+    mode |= ENABLE_WINDOW_INPUT;
+    mode |= ENABLE_MOUSE_INPUT;
+
+    SetConsoleMode(r->hInput, mode);
+
 
     COORD size = { (SHORT)WIDTH, (SHORT)HEIGHT };
     SetConsoleScreenBufferSize(r->hBuffer, size);
@@ -30,6 +46,51 @@ bool console_init(ConsoleRenderer* r) {
 
     return true;
 }
+
+void console_process_input(ConsoleRenderer* r) {
+    INPUT_RECORD records[32];
+    DWORD events = 0;
+
+    ReadConsoleInput(r->hInput, records, 32, &events);
+    input_state_init(&r->input);
+
+    for (DWORD i = 0; i < events; i++) {
+        INPUT_RECORD* rec = &records[i];
+
+        if (rec->EventType == KEY_EVENT) {
+            KEY_EVENT_RECORD key = rec->Event.KeyEvent;
+
+            if (key.bKeyDown) {
+                switch (key.wVirtualKeyCode) {
+                    case VK_UP:    // handle up
+                    case VK_DOWN:  // handle down
+                    case VK_LEFT:
+                    case VK_RIGHT:
+                    case VK_ESCAPE:
+                        break;
+                }
+
+                wchar_t ch = key.uChar.UnicodeChar;
+                r->input.keys[ch] = 1;
+            }
+        } else if (rec->EventType == MOUSE_EVENT) {
+            MOUSE_EVENT_RECORD mouse = rec->Event.MouseEvent;
+
+            if (mouse.dwButtonState & FROM_LEFT_1ST_BUTTON_PRESSED) {
+                int x = mouse.dwMousePosition.X;
+                int y = mouse.dwMousePosition.Y;
+
+                r->input.mouseDX = r->input.mouseX - x;
+                r->input.mouseDY = r->input.mouseY - y;
+
+                r->input.mouseX = x;
+                r->input.mouseY = y;
+                // handle click
+            }
+        }
+    }
+}
+
 
 void console_clear(ConsoleRenderer* console, wchar_t ch, WORD attr) {
     for (int i = 0; i < WIDTH*HEIGHT; ++i) {

@@ -24,31 +24,36 @@ public:
     ~voice_callback() { CloseHandle(hBufferEndEvent); }
 
     void OnStreamEnd() { 
-        OutputDebugStringA("On Stream End\n");
+        printf("On Stream End\n");
     }
 
     void OnVoiceProcessingPassEnd() { }
     void OnVoiceProcessingPassStart(UINT32 SamplesRequired) {    }
     void OnBufferEnd(void * pBufferContext) override { 
-        OutputDebugStringA("On Buffer End\n");
+        printf("On Buffer End\n");
         SetEvent(hBufferEndEvent);
     }
     void OnBufferStart(void * pBufferContext) {}
     void OnLoopEnd(void * pBufferContext) {}
     void OnVoiceError(void * pBufferContext, HRESULT Error) {
-        OutputDebugStringA("Error on voice\n");
+        printf("Error on voice\n");
     }
 };
 
 struct audio_engine {
     voice_callback* VoiceCallback;
-
-    XAUDIO2_BUFFER AudioBuffer;
-    b8 IsPlaying;
+    XAUDIO2_BUFFER  AudioBuffer;
+    b8              IsPlaying;
 
     IXAudio2*               xAudio2{};
     IXAudio2SourceVoice*    xAudio2SourceVoice{};
     IXAudio2MasteringVoice* xAudioMasteringVoice{};
+};
+
+struct song_data {
+    WAVEFORMATEX    Wfx;
+    XAUDIO2_BUFFER  AudioBuffer;
+    LH_String       SongName;
 };
 
 u8 AudioEngineInit(audio_engine* AudioEngine);

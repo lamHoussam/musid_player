@@ -187,7 +187,11 @@ int main() {
 
     // AudioEngineStartSong(&NetworkAudioEngine, WindowHandle, &SongHeader);
 
+    b8 Switch = false;
+
     while (GlobalRunning) {
+        console_process_input(&console);
+
         console_clear(&console, L' ', 0);
         // console_draw_rectangle(&console, {1, 3, WIDTH / 2 - 8, WIDTH / 2 + 8});
         // console_write_text(&console, WIDTH / 2 - 4, 2, L"M Player", 8);
@@ -195,8 +199,12 @@ int main() {
         render_bounds(&console);
         console_render(&console);
 
-        Sleep(1600);
-        AudioEngineTogglePlayPause(&AudioEngine);
+        // Sleep(10000);
+
+        if (console.input.keys[L'w']) {
+            printf("Got input action\n");
+            AudioEngineTogglePlayPause(&AudioEngine);
+        }
     }
 
     printf("End of program\n");
