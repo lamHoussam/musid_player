@@ -152,13 +152,13 @@ void console_draw_rectangle(ConsoleRenderer* console, const ConsoleRect rc) {
         return;
 
     for (int x = rc.left; x < rc.right; ++x) {
-        _console_put(console, x, rc.top, '\u2500', FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-        _console_put(console, x, rc.bottom, '\u2500', FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+        _console_put(console, x, rc.top, L'\u2500', FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+        _console_put(console, x, rc.bottom, L'\u2500', FOREGROUND_GREEN | FOREGROUND_INTENSITY);
     }
 
     for (int y = rc.top; y < rc.bottom; ++y) {
-        _console_put(console, rc.left, y, '\u2502', FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-        _console_put(console, rc.right, y, '\u2502', FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+        _console_put(console, rc.left, y, L'\u2502', FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+        _console_put(console, rc.right, y, L'\u2502', FOREGROUND_GREEN | FOREGROUND_INTENSITY);
     }
 }
 

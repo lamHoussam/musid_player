@@ -10,6 +10,112 @@
 #define fourccDPDS 'sdpd'
 
 
+
+
+#define HEADER_TOP      0
+#define HEADER_BOTTOM   4
+
+#define BODY_TOP        5
+#define BODY_BOTTOM     34
+
+#define PROGRESS_TOP    35
+#define PROGRESS_BOTTOM 39
+
+#define FOOTER_TOP      40
+#define FOOTER_BOTTOM   49
+
+#define PLAYLIST_LEFT   0
+#define PLAYLIST_RIGHT  59
+
+#define INFO_LEFT       60
+#define INFO_RIGHT      199
+
+
+#define COLOR_DEFAULT   7
+#define COLOR_HEADER    15
+#define COLOR_ACCENT    10
+#define COLOR_SELECTED  112
+
+
+void draw_header(ConsoleRenderer* c) {
+    ConsoleRect rc = {HEADER_TOP, HEADER_BOTTOM, 0, WIDTH - 1};
+    console_draw_rectangle(c, rc);
+
+    console_write_text(c, WIDTH/2 - 6, 2, L"TERMINAL PLAYER", 20);
+}
+
+
+void draw_playlist(ConsoleRenderer* c, int selected) {
+    ConsoleRect rc = {BODY_TOP, BODY_BOTTOM, PLAYLIST_LEFT, PLAYLIST_RIGHT};
+    console_draw_rectangle(c, rc);
+
+    console_write_text(c, 2, BODY_TOP, L" PLAYLIST ", 10);
+
+    int y = BODY_TOP + 2;
+
+    for (int i = 0; i < 20; i++) {
+        WORD attr = (i == selected) ? COLOR_SELECTED : COLOR_DEFAULT;
+
+        wchar_t buffer[64];
+        swprintf(buffer, 64, L"%02d. Track Name %d", i+1, i+1);
+
+        console_write_text(c, 2, y++, buffer, wcslen(buffer));
+    }
+}
+
+void draw_now_playing(ConsoleRenderer* c) {
+    ConsoleRect rc = {BODY_TOP, BODY_BOTTOM, INFO_LEFT, INFO_RIGHT};
+    console_draw_rectangle(c, rc);
+
+    console_write_text(c, INFO_LEFT + 2, BODY_TOP, L" NOW PLAYING ", 12);
+
+    int x = INFO_LEFT + 4;
+    int y = BODY_TOP + 3;
+
+    console_write_text(c, x, y,     L"Title : Interstellar Theme", 27);
+    console_write_text(c, x, y + 2, L"Artist: Hans Zimmer", 20);
+    console_write_text(c, x, y + 4, L"Album : Interstellar OST", 25);
+    console_write_text(c, x, y + 6, L"Year  : 2014", 13);
+}
+
+void draw_progress(ConsoleRenderer* c, float percent) {
+    ConsoleRect rc = {PROGRESS_TOP, PROGRESS_BOTTOM, 0, WIDTH - 1};
+    console_draw_rectangle(c, rc);
+
+    int barWidth = WIDTH - 10;
+    int filled = (int)(barWidth * percent);
+
+    int y = PROGRESS_TOP + 2;
+    int x = 5;
+
+    for (int i = 0; i < barWidth; i++) {
+        wchar_t ch = (i < filled) ? L'█' : L'░';
+        console_put(c, x + i, y, ch, COLOR_ACCENT);
+    }
+
+    wchar_t timeText[32];
+    swprintf(timeText, 32, L"01:23 / 04:56");
+
+    console_write_text(c, WIDTH - 20, y, timeText, wcslen(timeText));
+}
+
+void draw_footer(ConsoleRenderer* c) {
+    ConsoleRect rc = {FOOTER_TOP, FOOTER_BOTTOM, 0, WIDTH - 1};
+    console_draw_rectangle(c, rc);
+
+    console_write_text(c, 5, FOOTER_TOP + 2,
+        L"[SPACE] Play/Pause  [N] Next  [P] Prev  [S] Stop  [Q] Quit",
+        65);
+}
+
+
+
+
+
+
+
+
+
 static bool GlobalRunning = true;
 
 HRESULT WINAPI FindChunk(HANDLE hFile, DWORD fourcc, DWORD& dwChunkSize, DWORD& dwChunkDataPosition)
@@ -58,9 +164,7 @@ HRESULT WINAPI FindChunk(HANDLE hFile, DWORD fourcc, DWORD& dwChunkSize, DWORD& 
         }
 
         dwOffset += dwChunkDataSize;
-
         if (bytesRead >= dwRIFFDataSize) return S_FALSE;
-
     }
 
     return S_OK;
@@ -76,39 +180,6 @@ HRESULT ReadChunkData(HANDLE hFile, void * buffer, DWORD buffersize, DWORD buffe
         hr = HRESULT_FROM_WIN32( GetLastError() );
     return hr;
 }
-
-
-// LRESULT WINAPI Win32MainWindowCallback (
-//   HWND hWnd,
-//   UINT Message,
-//   WPARAM wParam,
-//   LPARAM lParam
-// )
-// {
-//     LRESULT Result = 0;
-//     switch(Message) {
-//         case WM_SIZE:
-//         {} break;
-//         case WM_DESTROY: 
-//         {
-//             GlobalRunning = false;
-//         } break;
-//         case WM_PAINT:
-//         {
-//             PAINTSTRUCT ps;
-//             RECT ClientRect;
-//             GetClientRect(hWnd, &ClientRect);
-//             int ClientWidth     = ClientRect.right - ClientRect.left;
-//             int ClientHeight    = ClientRect.bottom - ClientRect.top;
-//         } break;
-//         default:
-//         {
-//             Result = DefWindowProc(hWnd, Message, wParam, lParam);
-//         } break;
-//     }
-
-//     return Result;
-// }
 
 static int CreateAudioBufferFromWavFile(HANDLE FileHandle, WAVEFORMATEXTENSIBLE* Wfx, XAUDIO2_BUFFER* AudioBuffer) {
     if (INVALID_SET_FILE_POINTER == SetFilePointer(FileHandle, 0, 0, FILE_BEGIN)) {
@@ -190,22 +261,23 @@ int main() {
     b8 Switch = false;
 
     while (GlobalRunning) {
-        console_process_input(&console);
 
-        console_clear(&console, L' ', 0);
-        // console_draw_rectangle(&console, {1, 3, WIDTH / 2 - 8, WIDTH / 2 + 8});
-        // console_write_text(&console, WIDTH / 2 - 4, 2, L"M Player", 8);
+        console_process_input(&console);
+        console_clear(&console, L' ', COLOR_DEFAULT);
+
+        draw_header(&console);
+        draw_playlist(&console, 0);
+        draw_now_playing(&console);
+        draw_progress(&console, 40);
+        draw_footer(&console);
 
         render_bounds(&console);
         console_render(&console);
-
-        // Sleep(10000);
-
         if (console.input.keys[L'w']) {
-            printf("Got input action\n");
             AudioEngineTogglePlayPause(&AudioEngine);
         }
     }
+
 
     printf("End of program\n");
 
