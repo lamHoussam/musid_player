@@ -9,14 +9,6 @@
 // @NOTE: More
 #define BUFFER_SIZE         1024
 
-struct song_header {
-    i8  Artist[32];
-    i8  Album[32];
-    i8  Name[32];
-    u32 SampleRate;
-    u8  Channels;
-};
-
 struct voice_callback : public IXAudio2VoiceCallback {
 public: 
     HANDLE hBufferEndEvent;
@@ -40,6 +32,14 @@ public:
     }
 };
 
+struct song_data {
+    WAVEFORMATEX    Wfx;
+    XAUDIO2_BUFFER  AudioBuffer;
+    wchar_t         SongName[32];
+    wchar_t         Artist[32];
+    wchar_t         Album[32];
+};
+
 struct audio_engine {
     voice_callback* VoiceCallback;
     XAUDIO2_BUFFER  AudioBuffer;
@@ -48,16 +48,24 @@ struct audio_engine {
     IXAudio2*               xAudio2{};
     IXAudio2SourceVoice*    xAudio2SourceVoice{};
     IXAudio2MasteringVoice* xAudioMasteringVoice{};
-};
 
-struct song_data {
-    WAVEFORMATEX    Wfx;
-    XAUDIO2_BUFFER  AudioBuffer;
-    LH_String       SongName;
+    song_data*              Songs;
+    u64                     SongsCount;
+    u64                     CurrentSongIndex;
 };
 
 u8 AudioEngineInit(audio_engine* AudioEngine);
 u8 AudioEnginePause(audio_engine* AudioEngine);
 u8 AudioEnginePlay(audio_engine* AudioEngine);
 u8 AudioEngineTogglePlayPause(audio_engine* AudioEngine);
+u8 AudioEngineInitSong(audio_engine* AudioEngine, const char* Song);
+
+u8 AudioEngineLoadSongs(audio_engine* AudioEngine);
+
+
+u8 LoadSongDataFromFile(const char* File, song_data* OutSongData);
+
+
+
+
 
