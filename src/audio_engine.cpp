@@ -15,6 +15,10 @@ u8 AudioEngineInit(audio_engine* AudioEngine) {
 
     // @NOTE: Not true
     AudioEngine->IsPlaying = true;
+    AudioEngine->CurrentSongIndex   = 0;
+    AudioEngine->SongsCapacity      = 10;
+    AudioEngine->SongsCount         = 0;
+    AudioEngine->Songs = (song_data*)malloc(sizeof(song_data)*AudioEngine->SongsCapacity);
     // AudioEngineLoadSongs(AudioEngine);
 
     return 0;
@@ -36,17 +40,6 @@ u8 AudioEngineTogglePlayPause(audio_engine* AudioEngine) {
     if (AudioEngine->IsPlaying) { return AudioEnginePause(AudioEngine); }
     else { return AudioEnginePlay(AudioEngine); }
 }
-
-u8 AudioEngineStartSong(audio_engine* AudioEngine, u64 SongIndex) {
-    if (SongIndex < AudioEngine->SongsCount) {
-        song_data* ChosenSong = AudioEngine->Songs+SongIndex;
-        AudioEngineLoadSong(AudioEngine, ChosenSong->FilePath);
-        AudioEngine->xAudio2SourceVoice->Start(0);
-        return 0;
-    }
-    return 1;
-}
-
 
 HRESULT WINAPI FindChunk(HANDLE hFile, DWORD fourcc, DWORD& dwChunkSize, DWORD& dwChunkDataPosition)
 {
@@ -237,37 +230,59 @@ u8 LoadSongDataFromFile(const wchar_t* File, song_data* OutSongData) {
 
     memcpy_s(OutSongData->SongName, sizeof(wchar_t)*32, Name, sizeof(wchar_t)*wcslen(Name));
     memcpy_s(OutSongData->Artist, sizeof(wchar_t)*32, Artist, sizeof(wchar_t)*wcslen(Artist));
-    memcpy_s(OutSongData->FilePath, sizeof(wchar_t)*32, File, sizeof(wchar_t)*wcslen(File));
+    memcpy_s(OutSongData->FilePath, sizeof(wchar_t)*MAX_PATH, File, sizeof(wchar_t)*wcslen(File));
     // memcpy_s(OutSongData->Album, sizeof(wchar_t)*32, L"IDK", sizeof(wchar_t)*wcslen(A));
 
     return 0;
 }
 
-
-u8 AudioEngineLoadSongs(audio_engine* AudioEngine) {
-    // AudioEngine->SongsCount = 0;
-
-    AudioEngine->SongsCount = 4;
-    AudioEngine->Songs = (song_data*)malloc(sizeof(song_data)*AudioEngine->SongsCount);
-
-    AudioEngine->CurrentSongIndex = 3;
-
-    LoadDummySong(L"Interstellar Theme", L"Hand Zimmer", L"Interstellar OST", AudioEngine->Songs);
-    LoadDummySong(L"Vermilion Pt.2", L"Slipknot", L"Vermilion", AudioEngine->Songs+1);
-    LoadDummySong(L"Driven Under", L"Seether", L"Seether", AudioEngine->Songs+2);
-    LoadSongDataFromFile(L"data\\FadeToBlack_Metallica.wav", AudioEngine->Songs+3);
-
-    return 0;
-}
-
 u8 AudioEngineLoadSong(audio_engine* AudioEngine, const wchar_t* SongName) {
-    song_data SongData;
-    LoadSongDataFromFile(SongName, &SongData);
-    // @NOTE
-    AudioEngine->xAudio2->CreateSourceVoice(&AudioEngine->xAudio2SourceVoice, (WAVEFORMATEX*)&SongData.Wfx);
+    if (AudioEngine->SongsCount < AudioEngine->SongsCapacity) {
+        song_data* SongData = &AudioEngine->Songs[AudioEngine->SongsCount++];
 
-    AudioEngine->xAudio2SourceVoice->SubmitSourceBuffer(&SongData.AudioBuffer);
+        LoadSongDataFromFile(SongName, SongData);
+        // @NOTE
+        // AudioEngine->xAudio2->CreateSourceVoice(&AudioEngine->xAudio2SourceVoice, (WAVEFORMATEX*)&SongData->Wfx);
+
+        // AudioEngine->xAudio2SourceVoice->SubmitSourceBuffer(&SongData->AudioBuffer);
+    }
 
     return 0;
 }
 
+u8 _AudioEnginePlaySong(audio_engine* AudioEngine, u64 SongIndex) {
+    song_data* SongData = &AudioEngine->Songs[AudioEngine->CurrentSongIndex];
+
+    if (AudioEngine->xAudio2SourceVoice != nullptr) {
+        AudioEngine->xAudio2SourceVoice->Stop(0);
+        // @NOTE: Not sure its the right way
+        AudioEngine->xAudio2SourceVoice->FlushSourceBuffers();
+    }
+
+    AudioEngine->xAudio2->CreateSourceVoice(&AudioEngine->xAudio2SourceVoice, (WAVEFORMATEX*)&SongData->Wfx);
+
+
+    AudioEngine->xAudio2SourceVoice->SubmitSourceBuffer(&SongData->AudioBuffer);
+    AudioEngine->xAudio2SourceVoice->Start(0);
+
+    return 0;
+}
+
+// @NOTE
+u8 AudioEnginePlayNext(audio_engine* AudioEngine) {
+    if (AudioEngine->SongsCount == 0) { return 1; }
+    if (++AudioEngine->CurrentSongIndex >= AudioEngine->SongsCount) {
+        AudioEngine->CurrentSongIndex = 0;
+    }
+
+    return _AudioEnginePlaySong(AudioEngine, AudioEngine->CurrentSongIndex);
+}
+
+u8 AudioEnginePlayPrev(audio_engine* AudioEngine) {
+    if (AudioEngine->SongsCount == 0) { return 1; }
+    if (AudioEngine->CurrentSongIndex == 0) {
+        AudioEngine->CurrentSongIndex = AudioEngine->SongsCount - 1;
+    } else { --AudioEngine->CurrentSongIndex; }
+
+    return _AudioEnginePlaySong(AudioEngine, AudioEngine->CurrentSongIndex);
+}

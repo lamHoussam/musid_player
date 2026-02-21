@@ -11,7 +11,9 @@ void draw_playlist(app* App) {
     ConsoleRect rc = {BODY_TOP, BODY_BOTTOM, PLAYLIST_LEFT, PLAYLIST_RIGHT};
     console_draw_rectangle(&App->Renderer, rc);
 
-    console_write_text(&App->Renderer, 2, BODY_TOP, L" PLAYLIST ", 10);
+    wchar_t TitleBuffer[64];
+    swprintf(TitleBuffer, 64, L"PLAYLIST %lld", App->AudioEngine.SongsCount);
+    console_write_text(&App->Renderer, 2, BODY_TOP, TitleBuffer, wcslen(TitleBuffer));
 
     i32 y = BODY_TOP + 2;
 
@@ -84,12 +86,12 @@ u8 app_init(app* App) {
 
     AudioEngineInit(&App->AudioEngine);
     AudioEngineLoadSongsFromFolder(&App->AudioEngine, L"data");
-    // App->IsRunning = true;
     return 0;
 }
 
 void app_run(app* App) {
     printf("Start of program\n");
+    App->IsRunning = true;
     while (App->IsRunning) { app_update(App); }
     printf("End of program\n");
 }
@@ -109,16 +111,11 @@ void app_update(app* App) {
     render_bounds(&App->Renderer);
     console_render(&App->Renderer);
 
-    if (App->Renderer.input.keys[L'w']) {
-        AudioEngineTogglePlayPause(&App->AudioEngine);
-    }
-    if (App->Renderer.input.keys[L' ']) {
-        printf("Start song\n");
-        AudioEngineStartSong(&App->AudioEngine, 3);
-    }
-    if (App->Renderer.input.keys[L'q']) {
-        App->IsRunning = false;
-    }
+    if (App->Renderer.input.keys[L'n']) { AudioEnginePlayNext(&App->AudioEngine); }
+    if (App->Renderer.input.keys[L'p']) { AudioEnginePlayPrev(&App->AudioEngine); }
+    if (App->Renderer.input.keys[L' ']) { AudioEngineTogglePlayPause(&App->AudioEngine); }
+    if (App->Renderer.input.keys[L'q']) { App->IsRunning = false; }
+    if (App->Renderer.input.keys[L's']) { AudioEnginePause(&App->AudioEngine); }
 }
 
 

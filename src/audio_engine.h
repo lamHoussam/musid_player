@@ -38,7 +38,7 @@ struct song_data {
     wchar_t         SongName[32];
     wchar_t         Artist[32];
     wchar_t         Album[32];
-    wchar_t         FilePath[32];
+    wchar_t         FilePath[MAX_PATH];
 };
 
 struct audio_engine {
@@ -52,15 +52,17 @@ struct audio_engine {
 
     song_data*              Songs;
     u64                     SongsCount;
+    u64                     SongsCapacity;
     u64                     CurrentSongIndex;
 };
 
 u8 AudioEngineInit(audio_engine* AudioEngine);
+u8 AudioEngineLoadSong(audio_engine* AudioEngine, const wchar_t* Song);
+u8 AudioEngineLoadSongsFromFolder(audio_engine* AudioEngine, const wchar_t* Folder);
+
 u8 AudioEnginePause(audio_engine* AudioEngine);
 u8 AudioEnginePlay(audio_engine* AudioEngine);
 u8 AudioEngineTogglePlayPause(audio_engine* AudioEngine);
-u8 AudioEngineLoadSong(audio_engine* AudioEngine, const wchar_t* Song);
-u8 AudioEngineStartSong(audio_engine* AudioEngine, u64 SongIndex);
-u8 AudioEngineLoadSongsFromFolder(audio_engine* AudioEngine, const wchar_t* Folder);
 
-u8 AudioEngineLoadSongs(audio_engine* AudioEngine);
+u8 AudioEnginePlayNext(audio_engine* AudioEngine);
+u8 AudioEnginePlayPrev(audio_engine* AudioEngine);
