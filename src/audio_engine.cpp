@@ -15,7 +15,7 @@ u8 AudioEngineInit(audio_engine* AudioEngine) {
 
     // @NOTE: Not true
     AudioEngine->IsPlaying = true;
-    AudioEngineLoadSongs(AudioEngine);
+    // AudioEngineLoadSongs(AudioEngine);
 
     return 0;
 }
@@ -35,6 +35,16 @@ u8 AudioEnginePlay(audio_engine* AudioEngine) {
 u8 AudioEngineTogglePlayPause(audio_engine* AudioEngine) {
     if (AudioEngine->IsPlaying) { return AudioEnginePause(AudioEngine); }
     else { return AudioEnginePlay(AudioEngine); }
+}
+
+u8 AudioEngineStartSong(audio_engine* AudioEngine, u64 SongIndex) {
+    if (SongIndex < AudioEngine->SongsCount) {
+        song_data* ChosenSong = AudioEngine->Songs+SongIndex;
+        AudioEngineLoadSong(AudioEngine, ChosenSong->FilePath);
+        AudioEngine->xAudio2SourceVoice->Start(0);
+        return 0;
+    }
+    return 1;
 }
 
 
@@ -147,32 +157,62 @@ void LoadDummySong(const wchar_t* Name, const wchar_t* Artist, const wchar_t* Al
     memcpy_s(OutSong->Album, sizeof(wchar_t)*32, Album, sizeof(wchar_t)*32);
 }
 
-u8 AudioEngineLoadSongs(audio_engine* AudioEngine) {
-    // AudioEngine->SongsCount = 0;
+wchar_t* GetFileName(wchar_t* path)
+{
+    wchar_t* lastSlash = wcsrchr(path, L'\\');
+    wchar_t* lastForwardSlash = wcsrchr(path, L'/');
 
-    AudioEngine->SongsCount = 3;
-    AudioEngine->Songs = (song_data*)malloc(sizeof(song_data)*AudioEngine->SongsCount);
+    wchar_t* lastSeparator = lastSlash > lastForwardSlash 
+        ? lastSlash 
+        : lastForwardSlash;
 
-    AudioEngine->CurrentSongIndex = 1;
+    return lastSeparator ? lastSeparator + 1 : path;
+}
 
-    LoadDummySong(L"Interstellar Theme", L"Hand Zimmer", L"Interstellar OST", AudioEngine->Songs);
-    LoadDummySong(L"Vermilion Pt.2", L"Slipknot", L"Vermilion", AudioEngine->Songs+1);
-    LoadDummySong(L"Driven Under", L"Seether", L"Seether", AudioEngine->Songs+2);
+u8 AudioEngineLoadSongsFromFolder(audio_engine* AudioEngine, const wchar_t* Folder) {
+    wchar_t searchPath[MAX_PATH];
+    swprintf_s(searchPath, L"%s\\*.wav", Folder);
 
+    WIN32_FIND_DATAW findData;
+    HANDLE hFind = FindFirstFileW(searchPath, &findData);
+
+    if (hFind == INVALID_HANDLE_VALUE)
+    {
+        wprintf(L"Failed to open folder.\n");
+        return 1;
+    }
+
+    do
+    {
+        if (wcscmp(findData.cFileName, L".") == 0 ||
+            wcscmp(findData.cFileName, L"..") == 0)
+        {
+            continue;
+        }
+        if (!(findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+        {
+            wchar_t FilePath[MAX_PATH];
+            swprintf(FilePath, MAX_PATH, L"%ls\\%ls", Folder, findData.cFileName);
+            // @NOTE: Load the file into song_data
+            AudioEngineLoadSong(AudioEngine, FilePath);
+            wprintf(L"File: %s\n", FilePath);
+        }
+
+    } while (FindNextFileW(hFind, &findData));
+
+    FindClose(hFind);
     return 0;
 }
 
-u8 LoadSongDataFromFile(const char* File, song_data* OutSongData) {
-    TCHAR* strFileName = CharStr2WChar(File, (u64)strlen(File));
-    HANDLE hFile = CreateFile(
-        strFileName,
+u8 LoadSongDataFromFile(const wchar_t* File, song_data* OutSongData) {
+    HANDLE hFile = CreateFileW(
+        File,
         GENERIC_READ,
         FILE_SHARE_READ,
         NULL,
         OPEN_EXISTING,
         0,
         NULL);
-    free(strFileName);
 
     if( INVALID_HANDLE_VALUE == hFile )
         return HRESULT_FROM_WIN32( GetLastError() );
@@ -181,14 +221,46 @@ u8 LoadSongDataFromFile(const char* File, song_data* OutSongData) {
         return HRESULT_FROM_WIN32( GetLastError() );
 
     ParseSongDataFromWavFile(hFile, OutSongData);
-    strncpy((char*)OutSongData->SongName, "Interstellar Theme", 32);
-    strncpy((char*)OutSongData->Artist, "Hans Zimmer", 32);
-    strncpy((char*)OutSongData->Album, "Interstellar OST", 32);
+
+    // @NOTE: Add this to file metadata
+    wchar_t* FileName = GetFileName(const_cast<wchar_t*>(File));
+    wchar_t FileNameCopy[32];
+    size_t Size = min(wcslen(FileName), 32)*sizeof(wchar_t);
+
+    memcpy_s(FileNameCopy, Size, FileName, Size);
+    printf("%ls\n", FileNameCopy);
+    wchar_t* Name      = wcstok(FileNameCopy, L"_");
+    wchar_t* Artist    = wcstok(NULL, L"_");
+
+    printf("%ls\n", Name);
+    printf("%ls\n", Artist);
+
+    memcpy_s(OutSongData->SongName, sizeof(wchar_t)*32, Name, sizeof(wchar_t)*wcslen(Name));
+    memcpy_s(OutSongData->Artist, sizeof(wchar_t)*32, Artist, sizeof(wchar_t)*wcslen(Artist));
+    memcpy_s(OutSongData->FilePath, sizeof(wchar_t)*32, File, sizeof(wchar_t)*wcslen(File));
+    // memcpy_s(OutSongData->Album, sizeof(wchar_t)*32, L"IDK", sizeof(wchar_t)*wcslen(A));
 
     return 0;
 }
 
-u8 AudioEngineInitSong(audio_engine* AudioEngine, const char* SongName) {
+
+u8 AudioEngineLoadSongs(audio_engine* AudioEngine) {
+    // AudioEngine->SongsCount = 0;
+
+    AudioEngine->SongsCount = 4;
+    AudioEngine->Songs = (song_data*)malloc(sizeof(song_data)*AudioEngine->SongsCount);
+
+    AudioEngine->CurrentSongIndex = 3;
+
+    LoadDummySong(L"Interstellar Theme", L"Hand Zimmer", L"Interstellar OST", AudioEngine->Songs);
+    LoadDummySong(L"Vermilion Pt.2", L"Slipknot", L"Vermilion", AudioEngine->Songs+1);
+    LoadDummySong(L"Driven Under", L"Seether", L"Seether", AudioEngine->Songs+2);
+    LoadSongDataFromFile(L"data\\FadeToBlack_Metallica.wav", AudioEngine->Songs+3);
+
+    return 0;
+}
+
+u8 AudioEngineLoadSong(audio_engine* AudioEngine, const wchar_t* SongName) {
     song_data SongData;
     LoadSongDataFromFile(SongName, &SongData);
     // @NOTE

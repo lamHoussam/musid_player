@@ -3,7 +3,7 @@
 void draw_header(ConsoleRenderer* c) {
     ConsoleRect rc = {HEADER_TOP, HEADER_BOTTOM, 0, WIDTH - 1};
     console_draw_rectangle(c, rc);
-    console_write_text(c, WIDTH/2 - 6, 2, L"TERMINAL PLAYER", 20);
+    console_write_text(c, WIDTH/2 - 6, 2, L"TERMINAL PLAYER", 16);
 }
 
 
@@ -83,14 +83,13 @@ u8 app_init(app* App) {
     console_clear(&App->Renderer, L' ', 0);
 
     AudioEngineInit(&App->AudioEngine);
-    App->IsRunning = true;
+    AudioEngineLoadSongsFromFolder(&App->AudioEngine, L"data");
+    // App->IsRunning = true;
     return 0;
 }
 
 void app_run(app* App) {
     printf("Start of program\n");
-    // AudioEngineInitSong(&App->AudioEngine, "data\\song.wav");
-    // App->AudioEngine.xAudio2SourceVoice->Start(0);
     while (App->IsRunning) { app_update(App); }
     printf("End of program\n");
 }
@@ -112,6 +111,10 @@ void app_update(app* App) {
 
     if (App->Renderer.input.keys[L'w']) {
         AudioEngineTogglePlayPause(&App->AudioEngine);
+    }
+    if (App->Renderer.input.keys[L' ']) {
+        printf("Start song\n");
+        AudioEngineStartSong(&App->AudioEngine, 3);
     }
     if (App->Renderer.input.keys[L'q']) {
         App->IsRunning = false;
