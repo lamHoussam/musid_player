@@ -47,46 +47,55 @@ bool console_init(ConsoleRenderer* r) {
     return true;
 }
 
+// @NOTE: Rewrite
 void console_process_input(ConsoleRenderer* r) {
-    INPUT_RECORD records[32];
-    DWORD events = 0;
-
-    ReadConsoleInput(r->hInput, records, 32, &events);
     input_state_init(&r->input);
+    DWORD numEvents = 0;
+    GetNumberOfConsoleInputEvents(r->hInput, &numEvents);
 
-    for (DWORD i = 0; i < events; i++) {
-        INPUT_RECORD* rec = &records[i];
+    if (numEvents > 0)
+    {
+        INPUT_RECORD record;
+        DWORD numRead;
 
-        if (rec->EventType == KEY_EVENT) {
-            KEY_EVENT_RECORD key = rec->Event.KeyEvent;
+        PeekConsoleInput(r->hInput, &record, 1, &numRead);
 
-            if (key.bKeyDown) {
-                switch (key.wVirtualKeyCode) {
-                    case VK_UP:    // handle up
-                    case VK_DOWN:  // handle down
-                    case VK_LEFT:
-                    case VK_RIGHT:
-                    case VK_ESCAPE:
-                        break;
+        if (numRead > 0)
+        {
+            ReadConsoleInput(r->hInput, &record, 1, &numRead);
+            if (record.EventType == KEY_EVENT) {
+                KEY_EVENT_RECORD key = record.Event.KeyEvent;
+
+                if (key.bKeyDown) {
+                    switch (key.wVirtualKeyCode) {
+                        case VK_UP:    // handle up
+                        case VK_DOWN:  // handle down
+                        case VK_LEFT:
+                        case VK_RIGHT:
+                        case VK_ESCAPE:
+                            break;
+                    }
+
+                    wchar_t ch = key.uChar.UnicodeChar;
+                    r->input.keys[ch] = 1;
                 }
+            } else if (record.EventType == MOUSE_EVENT) {
+                MOUSE_EVENT_RECORD mouse = record.Event.MouseEvent;
 
-                wchar_t ch = key.uChar.UnicodeChar;
-                r->input.keys[ch] = 1;
+                if (mouse.dwButtonState & FROM_LEFT_1ST_BUTTON_PRESSED) {
+                    int x = mouse.dwMousePosition.X;
+                    int y = mouse.dwMousePosition.Y;
+
+                    r->input.mouseDX = r->input.mouseX - x;
+                    r->input.mouseDY = r->input.mouseY - y;
+
+                    r->input.mouseX = x;
+                    r->input.mouseY = y;
+                    // handle click
+                }
             }
-        } else if (rec->EventType == MOUSE_EVENT) {
-            MOUSE_EVENT_RECORD mouse = rec->Event.MouseEvent;
 
-            if (mouse.dwButtonState & FROM_LEFT_1ST_BUTTON_PRESSED) {
-                int x = mouse.dwMousePosition.X;
-                int y = mouse.dwMousePosition.Y;
-
-                r->input.mouseDX = r->input.mouseX - x;
-                r->input.mouseDY = r->input.mouseY - y;
-
-                r->input.mouseX = x;
-                r->input.mouseY = y;
-                // handle click
-            }
+            // Handle event
         }
     }
 }

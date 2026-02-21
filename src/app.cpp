@@ -99,8 +99,17 @@ void app_run(app* App) {
 void app_update(app* App) {
     ConsoleRenderer* console = &App->Renderer;
 
-    console_process_input(&App->Renderer);
     console_clear(&App->Renderer, L' ', COLOR_DEFAULT);
+    console_process_input(&App->Renderer);
+
+    if (App->Renderer.input.keys[L'n']) { AudioEnginePlayNext(&App->AudioEngine); }
+    if (App->Renderer.input.keys[L'p']) { AudioEnginePlayPrev(&App->AudioEngine); }
+    if (App->Renderer.input.keys[L' ']) { AudioEngineTogglePlayPause(&App->AudioEngine); }
+    if (App->Renderer.input.keys[L'q']) { App->IsRunning = false; }
+    if (App->Renderer.input.keys[L's']) { AudioEnginePause(&App->AudioEngine); }
+
+    AudioEngineUpdate(&App->AudioEngine);
+
 
     draw_header(&App->Renderer);
     draw_playlist(App);
@@ -110,12 +119,7 @@ void app_update(app* App) {
 
     render_bounds(&App->Renderer);
     console_render(&App->Renderer);
-
-    if (App->Renderer.input.keys[L'n']) { AudioEnginePlayNext(&App->AudioEngine); }
-    if (App->Renderer.input.keys[L'p']) { AudioEnginePlayPrev(&App->AudioEngine); }
-    if (App->Renderer.input.keys[L' ']) { AudioEngineTogglePlayPause(&App->AudioEngine); }
-    if (App->Renderer.input.keys[L'q']) { App->IsRunning = false; }
-    if (App->Renderer.input.keys[L's']) { AudioEnginePause(&App->AudioEngine); }
 }
 
+// Vinyle, pantalon, food, autre vetements
 

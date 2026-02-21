@@ -11,6 +11,9 @@
 u8 AudioEngineInit(audio_engine* AudioEngine) {
     ::CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     ::XAudio2Create(&AudioEngine->xAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);
+
+    AudioEngine->VoiceCallback = new voice_callback();
+
     AudioEngine->xAudio2->CreateMasteringVoice(&AudioEngine->xAudioMasteringVoice);
 
     // @NOTE: Not true
@@ -22,6 +25,15 @@ u8 AudioEngineInit(audio_engine* AudioEngine) {
     // AudioEngineLoadSongs(AudioEngine);
 
     return 0;
+}
+
+void AudioEngineUpdate(audio_engine* AudioEngine) {
+    if (WaitForSingleObject(AudioEngine->VoiceCallback->hBufferEndEvent, 0) == WAIT_OBJECT_0) { 
+        printf("I have awaited properly\n");
+        AudioEnginePlayNext(AudioEngine); 
+        printf("Started playing %lld\n", AudioEngine->CurrentSongIndex);
+        ResetEvent(AudioEngine->VoiceCallback->hBufferEndEvent);
+    }
 }
 
 u8 AudioEnginePause(audio_engine* AudioEngine) {
@@ -254,17 +266,18 @@ u8 _AudioEnginePlaySong(audio_engine* AudioEngine, u64 SongIndex) {
     song_data* SongData = &AudioEngine->Songs[AudioEngine->CurrentSongIndex];
 
     if (AudioEngine->xAudio2SourceVoice != nullptr) {
-        AudioEngine->xAudio2SourceVoice->Stop(0);
+        AudioEngine->xAudio2SourceVoice->DestroyVoice();
+        // AudioEngine->xAudio2SourceVoice->Stop(0);
         // @NOTE: Not sure its the right way
-        AudioEngine->xAudio2SourceVoice->FlushSourceBuffers();
+        // AudioEngine->xAudio2SourceVoice->FlushSourceBuffers();
     }
 
-    AudioEngine->xAudio2->CreateSourceVoice(&AudioEngine->xAudio2SourceVoice, (WAVEFORMATEX*)&SongData->Wfx);
-
+    AudioEngine->xAudio2->CreateSourceVoice(&AudioEngine->xAudio2SourceVoice, (WAVEFORMATEX*)&SongData->Wfx, 0, XAUDIO2_DEFAULT_FREQ_RATIO, AudioEngine->VoiceCallback, NULL, NULL);
 
     AudioEngine->xAudio2SourceVoice->SubmitSourceBuffer(&SongData->AudioBuffer);
     AudioEngine->xAudio2SourceVoice->Start(0);
 
+    printf("Started playing %lld\n", AudioEngine->CurrentSongIndex);
     return 0;
 }
 
