@@ -18,8 +18,9 @@ u8 AudioEngineInit(audio_engine* AudioEngine) {
 
     // @NOTE: Not true
     AudioEngine->IsPlaying = true;
-    AudioEngine->CurrentSongIndex   = 0;
-    AudioEngine->SongsCapacity      = 10;
+    AudioEngine->CurrentSongIndex       = 0;
+    // @NOTE: Check 
+    AudioEngine->SongsCapacity      = 100;
     AudioEngine->SongsCount         = 0;
     AudioEngine->Songs = (song_data*)malloc(sizeof(song_data)*AudioEngine->SongsCapacity);
     // AudioEngineLoadSongs(AudioEngine);
@@ -147,6 +148,8 @@ static int ParseSongDataFromWavFile(HANDLE FileHandle, song_data* OutSongData) {
     OutSongData->AudioBuffer.pAudioData = pDataBuffer;
     OutSongData->AudioBuffer.Flags = XAUDIO2_END_OF_STREAM;
 
+    OutSongData->SongBufferSize = dwChunkSize;
+
     return 0;
 }
 
@@ -227,22 +230,26 @@ u8 LoadSongDataFromFile(const wchar_t* File, song_data* OutSongData) {
 
     ParseSongDataFromWavFile(hFile, OutSongData);
 
-    // @NOTE: Add this to file metadata
+    // @NOTE: Read file metadata
     wchar_t* FileName = GetFileName(const_cast<wchar_t*>(File));
-    wchar_t FileNameCopy[32];
-    size_t Size = min(wcslen(FileName), 32)*sizeof(wchar_t);
+    wchar_t FileNameCopy[MAX_PATH];
+    size_t Size = min(wcslen(FileName), MAX_PATH)*sizeof(wchar_t);
 
     memcpy_s(FileNameCopy, Size, FileName, Size);
-    printf("%ls\n", FileNameCopy);
-    wchar_t* Name      = wcstok(FileNameCopy, L"_");
-    wchar_t* Artist    = wcstok(NULL, L"_");
+    // printf("%ls\n", FileNameCopy);
+    // wchar_t* Name      = wcstok(FileNameCopy, L"_");
+    // wchar_t* Artist    = wcstok(NULL, L"_");
 
-    printf("%ls\n", Name);
-    printf("%ls\n", Artist);
+    // printf("%ls\n", Name);
+    // printf("%ls\n", Artist);
 
-    memcpy_s(OutSongData->SongName, sizeof(wchar_t)*32, Name, sizeof(wchar_t)*wcslen(Name));
-    memcpy_s(OutSongData->Artist, sizeof(wchar_t)*32, Artist, sizeof(wchar_t)*wcslen(Artist));
+    memcpy_s(OutSongData->SongName, sizeof(wchar_t)*MAX_PATH, FileNameCopy, sizeof(wchar_t)*wcslen(FileNameCopy));
+    memcpy_s(OutSongData->Artist, sizeof(wchar_t)*MAX_PATH, L"Unknown", sizeof(wchar_t)*wcslen(L"Unknown"));
     memcpy_s(OutSongData->FilePath, sizeof(wchar_t)*MAX_PATH, File, sizeof(wchar_t)*wcslen(File));
+
+    // memcpy_s(OutSongData->SongName, sizeof(wchar_t)*32, Name, sizeof(wchar_t)*wcslen(Name));
+    // memcpy_s(OutSongData->Artist, sizeof(wchar_t)*32, Artist, sizeof(wchar_t)*wcslen(Artist));
+    // memcpy_s(OutSongData->FilePath, sizeof(wchar_t)*MAX_PATH, File, sizeof(wchar_t)*wcslen(File));
     // memcpy_s(OutSongData->Album, sizeof(wchar_t)*32, L"IDK", sizeof(wchar_t)*wcslen(A));
 
     return 0;

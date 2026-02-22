@@ -34,8 +34,8 @@ void draw_now_playing(app* App) {
 
     console_write_text(&App->Renderer, INFO_LEFT + 2, BODY_TOP, L" NOW PLAYING ", 12);
 
-    int x = INFO_LEFT + 4;
-    int y = BODY_TOP + 3;
+    i32 x = INFO_LEFT + 4;
+    i32 y = BODY_TOP + 3;
 
     if (App->AudioEngine.SongsCount > 0) {
         song_data SongData = App->AudioEngine.Songs[App->AudioEngine.CurrentSongIndex];
@@ -50,25 +50,44 @@ void draw_now_playing(app* App) {
     // console_write_text(c, x, y + 6, L"Year  : 2014", 13);
 }
 
-void draw_progress(ConsoleRenderer* c, float percent) {
+void draw_progress(app* App) {
+
+
     ConsoleRect rc = {PROGRESS_TOP, PROGRESS_BOTTOM, 0, WIDTH - 1};
-    console_draw_rectangle(c, rc);
+    console_draw_rectangle(&App->Renderer, rc);
 
-    int barWidth = WIDTH - 10;
-    int filled = (int)(barWidth * percent);
+    u64 SamplesPlayed = 0;
+    if (App->AudioEngine.xAudio2SourceVoice != nullptr) {
+        XAUDIO2_VOICE_STATE State;
+        App->AudioEngine.xAudio2SourceVoice->GetState(&State);
+        SamplesPlayed = State.SamplesPlayed;
+    }
 
-    int y = PROGRESS_TOP + 2;
-    int x = 5;
+    i32 barWidth = WIDTH - 40;
+    song_data* CurrentSong = App->AudioEngine.Songs+App->AudioEngine.CurrentSongIndex;
+    
+    u64 CurrentTimeInSec = SamplesPlayed / CurrentSong->Wfx.nSamplesPerSec;
 
-    for (int i = 0; i < barWidth; i++) {
-        wchar_t ch = (i < filled) ? L'█' : L'░';
-        console_put(c, x + i, y, ch, COLOR_ACCENT);
+    i32 y = PROGRESS_TOP + 2;
+    i32 x = 5;
+
+    i32 DurationInSec       = CurrentSong->SongBufferSize / CurrentSong->Wfx.nAvgBytesPerSec;
+    i32 FloorMinDuration    = DurationInSec / 60;
+    i32 RemainingSecs       = DurationInSec % 60;
+
+    i32 filled = (i32)((f32)barWidth * (1.0f*CurrentTimeInSec/DurationInSec));
+    i32 CurrentFloorMinDuration = CurrentTimeInSec / 60;
+    i32 CurrentRemainingSecs    = CurrentTimeInSec % 60;
+
+    for (i32 i = 0; i < barWidth; i++) {
+        wchar_t ch = (i < filled) ? L'x' : L' ';
+        console_put(&App->Renderer, x + i, y, ch, COLOR_ACCENT);
     }
 
     wchar_t timeText[32];
-    swprintf(timeText, 32, L"01:23 / 04:56");
+    swprintf(timeText, 32, L"%02d:%02d / %02d:%02d", CurrentFloorMinDuration, CurrentRemainingSecs, FloorMinDuration, RemainingSecs);
 
-    console_write_text(c, WIDTH - 20, y, timeText, wcslen(timeText));
+    console_write_text(&App->Renderer, WIDTH - 20, y, timeText, wcslen(timeText));
 }
 
 void draw_footer(ConsoleRenderer* c) {
@@ -114,12 +133,11 @@ void app_update(app* App) {
     draw_header(&App->Renderer);
     draw_playlist(App);
     draw_now_playing(App);
-    draw_progress(&App->Renderer, 40);
+    draw_progress(App);
     draw_footer(&App->Renderer);
 
     render_bounds(&App->Renderer);
     console_render(&App->Renderer);
 }
 
-// Vinyle, pantalon, food, autre vetements
 

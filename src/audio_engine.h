@@ -14,10 +14,11 @@ struct voice_callback;
 struct song_data {
     WAVEFORMATEX    Wfx;
     XAUDIO2_BUFFER  AudioBuffer;
-    wchar_t         SongName[32];
-    wchar_t         Artist[32];
     wchar_t         Album[32];
+    wchar_t         SongName[MAX_PATH];
+    wchar_t         Artist[MAX_PATH];
     wchar_t         FilePath[MAX_PATH];
+    u64             SongBufferSize;
 };
 
 struct audio_engine {
