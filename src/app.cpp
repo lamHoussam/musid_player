@@ -105,6 +105,8 @@ u8 app_init(app* App) {
 
     AudioEngineInit(&App->AudioEngine);
     AudioEngineLoadSongsFromFolder(&App->AudioEngine, L"data");
+    if (App->AudioEngine.SongsCount != 0) { AudioEnginePlaySongAtIndex(&App->AudioEngine, 0); }
+
     return 0;
 }
 

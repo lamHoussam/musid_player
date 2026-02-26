@@ -7,23 +7,25 @@
 
 #define MAX_BUFFER_COUNT    3
 // @NOTE: More
-#define BUFFER_SIZE         1024
+#define BUFFER_SIZE                     1024
+#define AUDIO_ENGINE_MAX_LOADED_SONGS   1
 
 struct voice_callback;
 
 struct song_data {
-    WAVEFORMATEX    Wfx;
     XAUDIO2_BUFFER  AudioBuffer;
+    WAVEFORMATEX    Wfx;
+    u64             SongBufferSize;
+    void*           SongBuffer;
     wchar_t         Album[32];
     wchar_t         SongName[MAX_PATH];
     wchar_t         Artist[MAX_PATH];
     wchar_t         FilePath[MAX_PATH];
-    u64             SongBufferSize;
+    b8              AudioBufferIsLoaded;
 };
 
 struct audio_engine {
     voice_callback* VoiceCallback;
-    XAUDIO2_BUFFER  AudioBuffer;
     b8              IsPlaying;
 
     IXAudio2*               xAudio2{};
@@ -34,11 +36,13 @@ struct audio_engine {
     u64                     SongsCount;
     u64                     SongsCapacity;
     u64                     CurrentSongIndex;
+    u64                     LoadedSongsCount;
 };
 
 u8      AudioEngineInit(audio_engine* AudioEngine);
 void    AudioEngineUpdate(audio_engine* AudioEngine);
 u8      AudioEngineLoadSong(audio_engine* AudioEngine, const wchar_t* Song);
+u8      AudioEngineUnloadSongAudioBuffer(audio_engine* AudioEngine, u64 SongIndex);
 u8      AudioEngineLoadSongsFromFolder(audio_engine* AudioEngine, const wchar_t* Folder);
 
 u8 AudioEnginePause(audio_engine* AudioEngine);
@@ -47,6 +51,7 @@ u8 AudioEngineTogglePlayPause(audio_engine* AudioEngine);
 
 u8 AudioEnginePlayNext(audio_engine* AudioEngine);
 u8 AudioEnginePlayPrev(audio_engine* AudioEngine);
+u8 AudioEnginePlaySongAtIndex(audio_engine* AudioEngine, u64 Index);
 
 struct voice_callback : public IXAudio2VoiceCallback {
 public: 

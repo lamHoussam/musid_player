@@ -6,6 +6,11 @@
 #define fourccWAVE 'EVAW'
 #define fourccXWMA 'AMWX'
 #define fourccDPDS 'sdpd'
+#define fourccLIST 'TSIL'
+#define fourccINFO 'OFNI'
+#define fourccIART 'TRAI'
+#define fourccINAM 'MANI'
+#define fourccIPRD 'DRPI'
 
 
 u8 AudioEngineInit(audio_engine* AudioEngine) {
@@ -118,7 +123,49 @@ HRESULT ReadChunkData(HANDLE hFile, void * buffer, DWORD buffersize, DWORD buffe
 }
 
 
-static int ParseSongDataFromWavFile(HANDLE FileHandle, song_data* OutSongData) {
+static void CharStr2WCharStr(const char* Str, wchar_t* wStr) {
+    const size_t cSize = strlen(Str)+1;
+    mbstowcs (wStr, Str, cSize);
+}
+
+static int _LoadSongAudioBufferFromFileHandle(HANDLE FileHandle, song_data* OutSongData) {
+    DWORD dwChunkSize;
+    DWORD dwChunkPosition;
+    // 'data' chunk
+    FindChunk(FileHandle, fourccDATA, dwChunkSize, dwChunkPosition);
+    OutSongData->SongBuffer = malloc(sizeof(BYTE)*dwChunkSize);
+    ReadChunkData(FileHandle, OutSongData->SongBuffer, dwChunkSize, dwChunkPosition);
+    OutSongData->AudioBuffer.AudioBytes = dwChunkSize;
+    OutSongData->AudioBuffer.pAudioData = (BYTE*)OutSongData->SongBuffer;
+    OutSongData->AudioBuffer.Flags = XAUDIO2_END_OF_STREAM;
+
+    OutSongData->SongBufferSize         = dwChunkSize;
+    OutSongData->AudioBufferIsLoaded    = true;
+    return 0;
+}
+
+
+static int _LoadSongAudioBufferFromFile(wchar_t* File, song_data* OutSongData) {
+
+    HANDLE hFile = CreateFileW(
+        File,
+        GENERIC_READ,
+        FILE_SHARE_READ,
+        NULL,
+        OPEN_EXISTING,
+        0,
+        NULL);
+
+    if( INVALID_HANDLE_VALUE == hFile )
+        return HRESULT_FROM_WIN32( GetLastError() );
+
+    if( INVALID_SET_FILE_POINTER == SetFilePointer( hFile, 0, NULL, FILE_BEGIN ) )
+        return HRESULT_FROM_WIN32( GetLastError() );
+    
+    return _LoadSongAudioBufferFromFileHandle(hFile, OutSongData);
+}
+
+static int ParseSongDataFromWavFile(HANDLE FileHandle, song_data* OutSongData, b32 LoadAudioBuffer) {
     if (INVALID_SET_FILE_POINTER == SetFilePointer(FileHandle, 0, 0, FILE_BEGIN)) {
         return HRESULT_FROM_WIN32(GetLastError());
     }
@@ -139,30 +186,69 @@ static int ParseSongDataFromWavFile(HANDLE FileHandle, song_data* OutSongData) {
     FindChunk(FileHandle, fourccFMT, dwChunkSize, dwChunkPosition);
     ReadChunkData(FileHandle, (WAVEFORMATEXTENSIBLE*)&OutSongData->Wfx, dwChunkSize, dwChunkPosition);
 
-    // 'data' chunk
-    FindChunk(FileHandle, fourccDATA, dwChunkSize, dwChunkPosition);
-    BYTE* pDataBuffer = new BYTE[dwChunkSize];
-    ReadChunkData(FileHandle, pDataBuffer, dwChunkSize, dwChunkPosition);
+    if (LoadAudioBuffer) {
+        _LoadSongAudioBufferFromFileHandle(FileHandle, OutSongData);
+    } 
 
-    OutSongData->AudioBuffer.AudioBytes = dwChunkSize;
-    OutSongData->AudioBuffer.pAudioData = pDataBuffer;
-    OutSongData->AudioBuffer.Flags = XAUDIO2_END_OF_STREAM;
+    if (FindChunk(FileHandle, fourccLIST, dwChunkSize, dwChunkPosition) == S_OK)
+    {
+        DWORD listType;
+        ReadChunkData(FileHandle, &listType, sizeof(DWORD), dwChunkPosition);
 
-    OutSongData->SongBufferSize = dwChunkSize;
+        if (listType == fourccINFO)
+        {
+            DWORD bytesRead = sizeof(DWORD);
+            DWORD currentPos = dwChunkPosition + sizeof(DWORD);
+
+            while (bytesRead < dwChunkSize)
+            {
+                DWORD chunkId;
+                DWORD chunkSize;
+
+                ReadChunkData(FileHandle, &chunkId, sizeof(DWORD), currentPos);
+                currentPos += sizeof(DWORD);
+
+                ReadChunkData(FileHandle, &chunkSize, sizeof(DWORD), currentPos);
+                currentPos += sizeof(DWORD);
+
+                if (chunkId == fourccIART) {
+                    char Artist[MAX_PATH];
+                    ReadChunkData(FileHandle, Artist, chunkSize, currentPos);
+                    Artist[chunkSize] = '\0';
+                    CharStr2WCharStr(Artist, OutSongData->Artist);
+                    break;
+                } else if (chunkId == fourccINAM) {
+                    char Title[MAX_PATH];
+                    ReadChunkData(FileHandle, Title, chunkSize, currentPos);
+                    Title[chunkSize] = '\0';
+                    CharStr2WCharStr(Title, OutSongData->SongName);
+                    break;
+                } else if (chunkId == fourccIPRD) {
+                    // @NOTE: Need default value for album
+                    char Album[MAX_PATH];
+                    ReadChunkData(FileHandle, Album, chunkSize, currentPos);
+                    Album[chunkSize] = '\0';
+                    CharStr2WCharStr(Album, OutSongData->Album);
+                    break;
+                }
+                currentPos += chunkSize;
+
+                if (chunkSize % 2 != 0)
+                    currentPos++;
+
+                bytesRead += sizeof(DWORD) * 2 + chunkSize;
+            }
+        }
+    }
 
     return 0;
-}
-
-TCHAR* CharStr2WChar(const char* data, u64 size) {
-    TCHAR* res = (TCHAR*)malloc(size*2);
-    for (int i = 0; i < size; ++i) { res[i] = (wchar_t)data[i]; }
-    return res;
 }
 
 void LoadDummySong(const wchar_t* Name, const wchar_t* Artist, const wchar_t* Album, song_data* OutSong) {
     memcpy_s(OutSong->SongName, sizeof(wchar_t)*32, Name, sizeof(wchar_t)*32);
     memcpy_s(OutSong->Artist, sizeof(wchar_t)*32, Artist, sizeof(wchar_t)*32);
     memcpy_s(OutSong->Album, sizeof(wchar_t)*32, Album, sizeof(wchar_t)*32);
+    OutSong->AudioBufferIsLoaded = false;
 }
 
 wchar_t* GetFileName(wchar_t* path)
@@ -175,6 +261,19 @@ wchar_t* GetFileName(wchar_t* path)
         : lastForwardSlash;
 
     return lastSeparator ? lastSeparator + 1 : path;
+}
+
+u8 AudioEngineUnloadSongAudioBuffer(audio_engine* AudioEngine, u64 SongIndex) {
+    song_data* SongData = AudioEngine->Songs+SongIndex;
+    if (SongData->AudioBufferIsLoaded) {
+        SongData->AudioBufferIsLoaded = false; 
+        free(SongData->SongBuffer);
+        SongData->AudioBuffer.AudioBytes = {0};
+        AudioEngine->LoadedSongsCount--;
+        printf("Unloaded song: %lld\n", SongIndex);
+    }
+
+    return 0;
 }
 
 u8 AudioEngineLoadSongsFromFolder(audio_engine* AudioEngine, const wchar_t* Folder) {
@@ -212,7 +311,7 @@ u8 AudioEngineLoadSongsFromFolder(audio_engine* AudioEngine, const wchar_t* Fold
     return 0;
 }
 
-u8 LoadSongDataFromFile(const wchar_t* File, song_data* OutSongData) {
+u8 LoadSongDataFromFile(const wchar_t* File, song_data* OutSongData, b32 LoadAudioBuffer) {
     HANDLE hFile = CreateFileW(
         File,
         GENERIC_READ,
@@ -228,29 +327,23 @@ u8 LoadSongDataFromFile(const wchar_t* File, song_data* OutSongData) {
     if( INVALID_SET_FILE_POINTER == SetFilePointer( hFile, 0, NULL, FILE_BEGIN ) )
         return HRESULT_FROM_WIN32( GetLastError() );
 
-    ParseSongDataFromWavFile(hFile, OutSongData);
+    ParseSongDataFromWavFile(hFile, OutSongData, LoadAudioBuffer);
 
     // @NOTE: Read file metadata
     wchar_t* FileName = GetFileName(const_cast<wchar_t*>(File));
-    wchar_t FileNameCopy[MAX_PATH];
     size_t Size = min(wcslen(FileName), MAX_PATH)*sizeof(wchar_t);
 
-    memcpy_s(FileNameCopy, Size, FileName, Size);
-    // printf("%ls\n", FileNameCopy);
-    // wchar_t* Name      = wcstok(FileNameCopy, L"_");
-    // wchar_t* Artist    = wcstok(NULL, L"_");
+    Size = min(wcslen(FileName), MAX_PATH)*sizeof(wchar_t);
+    memcpy_s(OutSongData->SongName, sizeof(wchar_t)*MAX_PATH, FileName, Size);
+    OutSongData->SongName[Size-1] = '\0';
 
-    // printf("%ls\n", Name);
-    // printf("%ls\n", Artist);
+    Size = min(wcslen(L"Unknown"), MAX_PATH)*sizeof(wchar_t);
+    memcpy_s(OutSongData->Artist, sizeof(wchar_t)*MAX_PATH, L"Unknown", Size);
+    OutSongData->Artist[Size-1] = '\0';
 
-    memcpy_s(OutSongData->SongName, sizeof(wchar_t)*MAX_PATH, FileNameCopy, sizeof(wchar_t)*wcslen(FileNameCopy));
-    memcpy_s(OutSongData->Artist, sizeof(wchar_t)*MAX_PATH, L"Unknown", sizeof(wchar_t)*wcslen(L"Unknown"));
-    memcpy_s(OutSongData->FilePath, sizeof(wchar_t)*MAX_PATH, File, sizeof(wchar_t)*wcslen(File));
-
-    // memcpy_s(OutSongData->SongName, sizeof(wchar_t)*32, Name, sizeof(wchar_t)*wcslen(Name));
-    // memcpy_s(OutSongData->Artist, sizeof(wchar_t)*32, Artist, sizeof(wchar_t)*wcslen(Artist));
-    // memcpy_s(OutSongData->FilePath, sizeof(wchar_t)*MAX_PATH, File, sizeof(wchar_t)*wcslen(File));
-    // memcpy_s(OutSongData->Album, sizeof(wchar_t)*32, L"IDK", sizeof(wchar_t)*wcslen(A));
+    Size = min(wcslen(File), MAX_PATH)*sizeof(wchar_t);
+    memcpy_s(OutSongData->FilePath, sizeof(wchar_t)*MAX_PATH, File, Size);
+    OutSongData->FilePath[Size-1] = '\0';
 
     return 0;
 }
@@ -258,8 +351,12 @@ u8 LoadSongDataFromFile(const wchar_t* File, song_data* OutSongData) {
 u8 AudioEngineLoadSong(audio_engine* AudioEngine, const wchar_t* SongName) {
     if (AudioEngine->SongsCount < AudioEngine->SongsCapacity) {
         song_data* SongData = &AudioEngine->Songs[AudioEngine->SongsCount++];
-
-        LoadSongDataFromFile(SongName, SongData);
+        if (AudioEngine->LoadedSongsCount <= AUDIO_ENGINE_MAX_LOADED_SONGS) {
+            LoadSongDataFromFile(SongName, SongData, true);
+            AudioEngine->LoadedSongsCount++;
+        } else {
+            LoadSongDataFromFile(SongName, SongData, false);
+        }
         // @NOTE
         // AudioEngine->xAudio2->CreateSourceVoice(&AudioEngine->xAudio2SourceVoice, (WAVEFORMATEX*)&SongData->Wfx);
 
@@ -269,8 +366,19 @@ u8 AudioEngineLoadSong(audio_engine* AudioEngine, const wchar_t* SongName) {
     return 0;
 }
 
-u8 _AudioEnginePlaySong(audio_engine* AudioEngine, u64 SongIndex) {
-    song_data* SongData = &AudioEngine->Songs[AudioEngine->CurrentSongIndex];
+// @NOTE: Maybe do it differently
+u8 _UnloadFirstLoadedSongThatIsNotPlaying(audio_engine* AudioEngine) {
+    for (u64 i = 0; i < AudioEngine->SongsCount; ++i) {
+        song_data* SongData = AudioEngine->Songs+i;
+        if (AudioEngine->CurrentSongIndex != i && SongData->AudioBufferIsLoaded) {
+            return AudioEngineUnloadSongAudioBuffer(AudioEngine, i);
+        }
+    }
+    return 1;
+}
+
+u8 _AudioEnginePlaySong(audio_engine* AudioEngine) {
+    song_data* SongData = AudioEngine->Songs+AudioEngine->CurrentSongIndex;
 
     if (AudioEngine->xAudio2SourceVoice != nullptr) {
         AudioEngine->xAudio2SourceVoice->DestroyVoice();
@@ -279,30 +387,42 @@ u8 _AudioEnginePlaySong(audio_engine* AudioEngine, u64 SongIndex) {
         // AudioEngine->xAudio2SourceVoice->FlushSourceBuffers();
     }
 
+    if (!SongData->AudioBufferIsLoaded) {
+        _LoadSongAudioBufferFromFile(SongData->FilePath, SongData);
+    }
+
     AudioEngine->xAudio2->CreateSourceVoice(&AudioEngine->xAudio2SourceVoice, (WAVEFORMATEX*)&SongData->Wfx, 0, XAUDIO2_DEFAULT_FREQ_RATIO, AudioEngine->VoiceCallback, NULL, NULL);
 
     AudioEngine->xAudio2SourceVoice->SubmitSourceBuffer(&SongData->AudioBuffer);
     AudioEngine->xAudio2SourceVoice->Start(0);
 
+    _UnloadFirstLoadedSongThatIsNotPlaying(AudioEngine);
+
     printf("Started playing %lld\n", AudioEngine->CurrentSongIndex);
     return 0;
 }
 
-// @NOTE
+u8 AudioEnginePlaySongAtIndex(audio_engine* AudioEngine, u64 Index) {
+    AudioEngine->CurrentSongIndex = Index;
+    return _AudioEnginePlaySong(AudioEngine);
+}
+
 u8 AudioEnginePlayNext(audio_engine* AudioEngine) {
     if (AudioEngine->SongsCount == 0) { return 1; }
+    // @NOTE: Check
     if (++AudioEngine->CurrentSongIndex >= AudioEngine->SongsCount) {
         AudioEngine->CurrentSongIndex = 0;
     }
 
-    return _AudioEnginePlaySong(AudioEngine, AudioEngine->CurrentSongIndex);
+    return _AudioEnginePlaySong(AudioEngine);
 }
 
 u8 AudioEnginePlayPrev(audio_engine* AudioEngine) {
     if (AudioEngine->SongsCount == 0) { return 1; }
+    // @NOTE: Check
     if (AudioEngine->CurrentSongIndex == 0) {
         AudioEngine->CurrentSongIndex = AudioEngine->SongsCount - 1;
     } else { --AudioEngine->CurrentSongIndex; }
 
-    return _AudioEnginePlaySong(AudioEngine, AudioEngine->CurrentSongIndex);
+    return _AudioEnginePlaySong(AudioEngine);
 }
