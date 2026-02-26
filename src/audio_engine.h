@@ -10,6 +10,9 @@
 #define BUFFER_SIZE                     1024
 #define AUDIO_ENGINE_MAX_LOADED_SONGS   1
 
+#define AUDIO_ENGINE_MAX_VOLUME         10
+#define AUDIO_ENGINE_MIN_VOLUME         0
+
 struct voice_callback;
 
 struct song_data {
@@ -37,6 +40,7 @@ struct audio_engine {
     u64                     SongsCapacity;
     u64                     CurrentSongIndex;
     u64                     LoadedSongsCount;
+    i32                     CurrentVolume;
 };
 
 u8      AudioEngineInit(audio_engine* AudioEngine);

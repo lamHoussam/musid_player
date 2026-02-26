@@ -99,6 +99,19 @@ void draw_footer(ConsoleRenderer* c) {
         65);
 }
 
+void draw_volume(app* App) {
+    wchar_t VolumeText[32];
+
+    swprintf(VolumeText, 32, L"%02d / %02d / %02d", 
+        AUDIO_ENGINE_MIN_VOLUME, 
+        App->AudioEngine.CurrentVolume, 
+        AUDIO_ENGINE_MAX_VOLUME);
+
+    i32 y = PROGRESS_TOP + 8;
+
+    console_write_text(&App->Renderer, WIDTH - 20, y, VolumeText, wcslen(VolumeText));
+}
+
 u8 app_init(app* App) {
     console_init(&App->Renderer);
     console_clear(&App->Renderer, L' ', 0);
@@ -128,6 +141,8 @@ void app_update(app* App) {
     if (App->Renderer.input.keys[L' ']) { AudioEngineTogglePlayPause(&App->AudioEngine); }
     if (App->Renderer.input.keys[L'q']) { App->IsRunning = false; }
     if (App->Renderer.input.keys[L's']) { AudioEnginePause(&App->AudioEngine); }
+    if (App->Renderer.input.keys[L'u']) { App->AudioEngine.CurrentVolume++; }
+    if (App->Renderer.input.keys[L'd']) { App->AudioEngine.CurrentVolume--; }
 
     AudioEngineUpdate(&App->AudioEngine);
 
@@ -137,6 +152,7 @@ void app_update(app* App) {
     draw_now_playing(App);
     draw_progress(App);
     draw_footer(&App->Renderer);
+    draw_volume(App);
 
     render_bounds(&App->Renderer);
     console_render(&App->Renderer);

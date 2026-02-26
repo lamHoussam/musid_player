@@ -28,12 +28,15 @@ u8 AudioEngineInit(audio_engine* AudioEngine) {
     AudioEngine->SongsCapacity      = 100;
     AudioEngine->SongsCount         = 0;
     AudioEngine->Songs = (song_data*)malloc(sizeof(song_data)*AudioEngine->SongsCapacity);
-    // AudioEngineLoadSongs(AudioEngine);
+    AudioEngine->CurrentVolume = AUDIO_ENGINE_MAX_VOLUME;
 
     return 0;
 }
 
 void AudioEngineUpdate(audio_engine* AudioEngine) {
+    f32 FloatVolume = 1.0f * (AudioEngine->CurrentVolume - AUDIO_ENGINE_MIN_VOLUME) / (AUDIO_ENGINE_MAX_VOLUME - AUDIO_ENGINE_MIN_VOLUME);
+
+    AudioEngine->xAudioMasteringVoice->SetVolume(FloatVolume);
     if (WaitForSingleObject(AudioEngine->VoiceCallback->hBufferEndEvent, 0) == WAIT_OBJECT_0) { 
         printf("I have awaited properly\n");
         AudioEnginePlayNext(AudioEngine); 
