@@ -1,5 +1,9 @@
 #include "app.h"
 
+#define SONGS_FOLDER L"test_data"
+
+
+
 void draw_header(ConsoleRenderer* c) {
     ConsoleRect rc = {HEADER_TOP, HEADER_BOTTOM, 0, WIDTH - 1};
     console_draw_rectangle(c, rc);
@@ -117,7 +121,7 @@ u8 app_init(app* App) {
     console_clear(&App->Renderer, L' ', 0);
 
     AudioEngineInit(&App->AudioEngine);
-    AudioEngineLoadSongsFromFolder(&App->AudioEngine, L"data");
+    AudioEngineLoadSongsFromFolder(&App->AudioEngine, SONGS_FOLDER);
     if (App->AudioEngine.SongsCount != 0) { AudioEnginePlaySongAtIndex(&App->AudioEngine, 0); }
 
     return 0;
