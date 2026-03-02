@@ -29,10 +29,16 @@
 #define COLOR_SELECTED  112
 
 
+struct ui_state {
+    u64 UIVisualStartIndex;
+    u64 UICurrentSelectedIndex;
+};
+
 struct app
 {
     audio_engine    AudioEngine;
     ConsoleRenderer Renderer;
+    ui_state        UIState;
     b8              IsRunning;
 };
 

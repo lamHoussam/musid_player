@@ -1,6 +1,6 @@
 #include "app.h"
 
-#define SONGS_FOLDER L"test_data"
+#define SONGS_FOLDER L"data"
 
 
 
@@ -76,8 +76,11 @@ void RenderLayout_Library(app* App) {
 
     draw_box(r, 0, 0, WIDTH - 1, 2, UI_ACCENT);
 
+    wchar_t LibraryTitle[40];
+    swprintf(LibraryTitle, 40, L"LIBRARY - %lld Tracks", AudioEngine->SongsCount);
+
     write_padded(r, 2, 1,
-        L"LIBRARY — 3,412 Tracks",
+        LibraryTitle,
         40,
         UI_HEADER);
 
@@ -92,6 +95,9 @@ void RenderLayout_Library(app* App) {
 
     const i32 tableTop = 3;
     const i32 tableBottom = 45;
+
+    const i32 MaxSongsToRenderCount = tableBottom - tableTop - 3;
+    const i32 SongsToRenderCount    = min(AudioEngine->SongsCount - App->UIState.UIVisualStartIndex, MaxSongsToRenderCount);
 
     draw_box(r, 0, tableTop, WIDTH - 1, tableBottom, UI_ACCENT);
 
@@ -121,25 +127,25 @@ void RenderLayout_Library(app* App) {
     // ========================================================
 
     i32 startY = headerY + 2;
-
-    for (i32 i = 0; i < AudioEngine->SongsCount; ++i) {
+    for (i32 i = 0; i < SongsToRenderCount; ++i) {
         i32 y = startY + i;
+
+        i32 SongIndex = App->UIState.UIVisualStartIndex+i;
 
         WORD attr = UI_TEXT;
 
-        bool isPlaying = (i == 0);
-        bool isSelected = (i == 1);
+        b32 isPlaying = (SongIndex == AudioEngine->CurrentSongIndex);
+        b32 isSelected = (SongIndex == 1);
 
         if (isPlaying) { attr = UI_PLAYING; }
         if (isSelected) { attr = UI_SELECTED; }
 
         wchar_t num[8];
-        if (isPlaying) { 
-            swprintf(num, 9, L"%lc%03d", UI_PLAY, i + 1); } 
-        else { swprintf(num, 9, L"%03d", i + 1); }
+        if (isPlaying) { swprintf(num, 9, L"%lc%03d", UI_PLAY, SongIndex + 1); } 
+        else { swprintf(num, 9, L"%03d", SongIndex + 1); }
 
         // @NOTE: Maybe calculate once
-        song_data* SongData = AudioEngine->Songs+i;
+        song_data* SongData = AudioEngine->Songs+SongIndex;
 
         i32 DurationInSec       = SongData->SongBufferSize / SongData->Wfx.nAvgBytesPerSec;
         i32 FloorMinDuration    = DurationInSec / 60;
@@ -239,6 +245,17 @@ void RenderLayout_Library(app* App) {
         VolumeText,
         5,
         UI_TEXT);
+
+
+
+    // UPDATE
+    if (AudioEngine->CurrentSongIndex >= App->UIState.UIVisualStartIndex + MaxSongsToRenderCount) {
+        App->UIState.UIVisualStartIndex     += 1;
+        App->UIState.UICurrentSelectedIndex %= AudioEngine->SongsCount;
+    } else if (AudioEngine->CurrentSongIndex < App->UIState.UIVisualStartIndex) {
+        App->UIState.UIVisualStartIndex     -= 1;
+        App->UIState.UICurrentSelectedIndex %= AudioEngine->SongsCount;
+    }
 
 }
 
@@ -371,6 +388,8 @@ u8 app_init(app* App) {
     AudioEngineInit(&App->AudioEngine);
     AudioEngineLoadSongsFromFolder(&App->AudioEngine, SONGS_FOLDER);
     if (App->AudioEngine.SongsCount != 0) { AudioEnginePlaySongAtIndex(&App->AudioEngine, 0); }
+
+    App->UIState.UIVisualStartIndex = 0;
 
     return 0;
 }
