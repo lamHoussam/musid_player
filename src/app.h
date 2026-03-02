@@ -41,6 +41,7 @@ void    draw_playlist(app* App);
 void    draw_now_playing(app* App);
 void    draw_progress(app* App);
 void    draw_footer(ConsoleRenderer* c);
+
 u8      app_init(app* App);
 void    app_run(app* App);
 void    app_update(app* App);

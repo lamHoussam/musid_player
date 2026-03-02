@@ -27,11 +27,11 @@ bool console_init(ConsoleRenderer* r) {
     mode |= ENABLE_EXTENDED_FLAGS;
     mode |= ENABLE_WINDOW_INPUT;
     mode |= ENABLE_MOUSE_INPUT;
+    mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
 
     SetConsoleMode(r->hInput, mode);
-
-
     COORD size = { (SHORT)WIDTH, (SHORT)HEIGHT };
+
     SetConsoleScreenBufferSize(r->hBuffer, size);
 
     SMALL_RECT rect = { 0, 0, (SHORT)(WIDTH - 1), (SHORT)(HEIGHT - 1) };
