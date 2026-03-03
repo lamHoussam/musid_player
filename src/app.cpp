@@ -37,8 +37,7 @@ static void draw_vline(ConsoleRenderer* r, i32 x, i32 y0, i32 y1, WORD attr)
     for (i32 y = y0; y <= y1; ++y) { console_put(r, x, y, UI_VLINE, attr); }
 }
 
-static void draw_box(ConsoleRenderer* r, i32 left, i32 top, i32 right, i32 bottom, WORD attr)
-{
+static void draw_box(ConsoleRenderer* r, i32 left, i32 top, i32 right, i32 bottom, WORD attr) {
     console_put(r, left,  top,    UI_CORNER_TL, attr);
     console_put(r, right, top,    UI_CORNER_TR, attr);
     console_put(r, left,  bottom, UI_CORNER_BL, attr);
@@ -50,8 +49,7 @@ static void draw_box(ConsoleRenderer* r, i32 left, i32 top, i32 right, i32 botto
     draw_vline(r, right,  top + 1,  bottom - 1, attr);
 }
 
-static void write_padded(ConsoleRenderer* r, i32 x, i32 y, const wchar_t* text, i32 width, WORD attr)
-{
+static void write_padded(ConsoleRenderer* r, i32 x, i32 y, const wchar_t* text, i32 width, WORD attr) {
     i32 len = (int)wcslen(text);
     i32 copy = len > width ? width : len;
 
@@ -135,7 +133,7 @@ void RenderLayout_Library(app* App) {
         WORD attr = UI_TEXT;
 
         b32 isPlaying = (SongIndex == AudioEngine->CurrentSongIndex);
-        b32 isSelected = (SongIndex == 1);
+        b32 isSelected = (SongIndex == App->UIState.UICurrentSelectedSongIndex);
 
         if (isPlaying) { attr = UI_PLAYING; }
         if (isSelected) { attr = UI_SELECTED; }
@@ -162,14 +160,6 @@ void RenderLayout_Library(app* App) {
         write_padded(r, colFav,    y, (i % 2 == 0) ? UI_HEART_STR : L"",    2,  attr);
         // write_padded(r, colPlays,  y, L"213",                               6,  attr);
     }
-
-    // ========================================================
-    // SCROLLBAR
-    // ========================================================
-
-    i32 scrollX = WIDTH - 2;
-    for (i32 y = headerY + 2; y < tableBottom; ++y) { console_put(r, scrollX, y, UI_BLOCK_LIGHT, UI_DIM); }
-    for (i32 y = headerY + 4; y < headerY + 10; ++y) { console_put(r, scrollX, y, UI_BLOCK_FULL, UI_ACCENT); }
 
     // ========================================================
     // MINI PLAYER (46–49)
@@ -249,12 +239,12 @@ void RenderLayout_Library(app* App) {
 
 
     // UPDATE
-    if (AudioEngine->CurrentSongIndex >= App->UIState.UIVisualStartIndex + MaxSongsToRenderCount) {
-        App->UIState.UIVisualStartIndex     += 1;
-        App->UIState.UICurrentSelectedIndex %= AudioEngine->SongsCount;
-    } else if (AudioEngine->CurrentSongIndex < App->UIState.UIVisualStartIndex) {
-        App->UIState.UIVisualStartIndex     -= 1;
-        App->UIState.UICurrentSelectedIndex %= AudioEngine->SongsCount;
+    if (App->UIState.UICurrentSelectedSongIndex >= App->UIState.UIVisualStartIndex + MaxSongsToRenderCount) {
+        App->UIState.UIVisualStartIndex += 1;
+        App->UIState.UIVisualStartIndex %= AudioEngine->SongsCount;
+    } else if (App->UIState.UICurrentSelectedSongIndex < App->UIState.UIVisualStartIndex) {
+        App->UIState.UIVisualStartIndex -= 1;
+        App->UIState.UIVisualStartIndex %= AudioEngine->SongsCount;
     }
 
 }
@@ -390,6 +380,7 @@ u8 app_init(app* App) {
     if (App->AudioEngine.SongsCount != 0) { AudioEnginePlaySongAtIndex(&App->AudioEngine, 0); }
 
     App->UIState.UIVisualStartIndex = 0;
+    App->UIState.UICurrentSelectedSongIndex = 0;
 
     return 0;
 }
@@ -415,8 +406,20 @@ void app_update(app* App) {
     if (App->Renderer.input.keys[L'u']) { App->AudioEngine.CurrentVolume++; }
     if (App->Renderer.input.keys[L'd']) { App->AudioEngine.CurrentVolume--; }
 
-    AudioEngineUpdate(&App->AudioEngine);
+    if (App->Renderer.input.keys[L'j']) { 
+        App->UIState.UICurrentSelectedSongIndex += 1; 
+        App->UIState.UICurrentSelectedSongIndex %= App->AudioEngine.SongsCount;
+    }
+    if (App->Renderer.input.keys[L'k']) { 
+        App->UIState.UICurrentSelectedSongIndex -= 1; 
+        App->UIState.UICurrentSelectedSongIndex %= App->AudioEngine.SongsCount;
+    }
+    if (App->Renderer.input.keys[VK_RETURN]) {
+        AudioEnginePlaySongAtIndex(&App->AudioEngine, App->UIState.UICurrentSelectedSongIndex);
+        App->Renderer.input.keys[VK_RETURN] = false;
+    }
 
+    AudioEngineUpdate(&App->AudioEngine);
     RenderLayout_Library(App);
 
 

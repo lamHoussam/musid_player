@@ -31,7 +31,7 @@
 
 struct ui_state {
     u64 UIVisualStartIndex;
-    u64 UICurrentSelectedIndex;
+    u64 UICurrentSelectedSongIndex;
 };
 
 struct app
