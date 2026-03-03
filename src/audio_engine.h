@@ -15,15 +15,20 @@
 
 struct voice_callback;
 
+struct song_metadata {
+    wchar_t Album[32];
+    wchar_t SongName[MAX_PATH];
+    wchar_t Artist[MAX_PATH];
+    wchar_t FilePath[MAX_PATH];
+    i32     DurationInSec;
+};
+
 struct song_data {
     XAUDIO2_BUFFER  AudioBuffer;
     WAVEFORMATEX    Wfx;
     u64             SongBufferSize;
     void*           SongBuffer;
-    wchar_t         Album[32];
-    wchar_t         SongName[MAX_PATH];
-    wchar_t         Artist[MAX_PATH];
-    wchar_t         FilePath[MAX_PATH];
+    song_metadata   SongMetadata;
     b8              AudioBufferIsLoaded;
 };
 

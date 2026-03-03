@@ -95,7 +95,7 @@ void RenderLayout_Library(app* App) {
     const i32 tableBottom = 45;
 
     const i32 MaxSongsToRenderCount = tableBottom - tableTop - 3;
-    const i32 SongsToRenderCount    = min(AudioEngine->SongsCount - App->UIState.UIVisualStartIndex, MaxSongsToRenderCount);
+    const i32 SongsToRenderCount    = min(App->UIState.MetadataCount - App->UIState.UIVisualStartIndex, MaxSongsToRenderCount);
 
     draw_box(r, 0, tableTop, WIDTH - 1, tableBottom, UI_ACCENT);
 
@@ -143,11 +143,10 @@ void RenderLayout_Library(app* App) {
         else { swprintf(num, 9, L"%03d", SongIndex + 1); }
 
         // @NOTE: Maybe calculate once
-        song_data* SongData = AudioEngine->Songs+SongIndex;
+        song_metadata* SongData = App->UIState.MetadataToRenderBuffer+SongIndex;
 
-        i32 DurationInSec       = SongData->SongBufferSize / SongData->Wfx.nAvgBytesPerSec;
-        i32 FloorMinDuration    = DurationInSec / 60;
-        i32 RemainingSecs       = DurationInSec % 60;
+        i32 FloorMinDuration    = SongData->DurationInSec / 60;
+        i32 RemainingSecs       = SongData->DurationInSec % 60;
 
         wchar_t TimeText[32];
         swprintf(TimeText, 32, L"%02d:%02d", FloorMinDuration, RemainingSecs);
@@ -239,14 +238,15 @@ void RenderLayout_Library(app* App) {
 
 
     // UPDATE
-    if (App->UIState.UICurrentSelectedSongIndex >= App->UIState.UIVisualStartIndex + MaxSongsToRenderCount) {
+    if (App->UIState.UICurrentSelectedSongIndex < App->UIState.UIVisualStartIndex) {
+        if (App->UIState.UIVisualStartIndex == 0) { 
+            App->UIState.UIVisualStartIndex = AudioEngine->SongsCount - MaxSongsToRenderCount + 1;
+        }
+        else { App->UIState.UIVisualStartIndex -= 1; }
+    } else if (App->UIState.UICurrentSelectedSongIndex >= App->UIState.UIVisualStartIndex + MaxSongsToRenderCount) {
         App->UIState.UIVisualStartIndex += 1;
         App->UIState.UIVisualStartIndex %= AudioEngine->SongsCount;
-    } else if (App->UIState.UICurrentSelectedSongIndex < App->UIState.UIVisualStartIndex) {
-        App->UIState.UIVisualStartIndex -= 1;
-        App->UIState.UIVisualStartIndex %= AudioEngine->SongsCount;
     }
-
 }
 
 
@@ -277,7 +277,7 @@ void draw_playlist(app* App) {
         WORD attr = (i == App->AudioEngine.CurrentSongIndex) ? COLOR_SELECTED : COLOR_DEFAULT;
 
         wchar_t buffer[64];
-        swprintf(buffer, 64, L"%02d. %s", i+1, App->AudioEngine.Songs[i].SongName);
+        swprintf(buffer, 64, L"%02d. %s", i+1, App->AudioEngine.Songs[i].SongMetadata.SongName);
 
         console_write_text(&App->Renderer, 2, y++, buffer, wcslen(buffer));
     }
@@ -295,9 +295,9 @@ void draw_now_playing(app* App) {
     if (App->AudioEngine.SongsCount > 0) {
         song_data SongData = App->AudioEngine.Songs[App->AudioEngine.CurrentSongIndex];
 
-        console_write_text(&App->Renderer, x, y, SongData.SongName, wcslen(SongData.SongName));
-        console_write_text(&App->Renderer, x, y + 2, SongData.Artist, wcslen(SongData.Artist));
-        console_write_text(&App->Renderer, x, y + 4, SongData.Album, wcslen(SongData.Album));
+        console_write_text(&App->Renderer, x, y, SongData.SongMetadata.SongName, wcslen(SongData.SongMetadata.SongName));
+        console_write_text(&App->Renderer, x, y + 2, SongData.SongMetadata.Artist, wcslen(SongData.SongMetadata.Artist));
+        console_write_text(&App->Renderer, x, y + 4, SongData.SongMetadata.Album, wcslen(SongData.SongMetadata.Album));
     }
 }
 
@@ -382,6 +382,13 @@ u8 app_init(app* App) {
     App->UIState.UIVisualStartIndex = 0;
     App->UIState.UICurrentSelectedSongIndex = 0;
 
+    App->UIState.MetadataToRenderBuffer = (song_metadata*)malloc(sizeof(song_metadata)*App->AudioEngine.SongsCount);
+    App->UIState.MetadataCount          = App->AudioEngine.SongsCount;
+
+    for (i64 i = 0; i < App->UIState.MetadataCount; ++i) {
+        memcpy(App->UIState.MetadataToRenderBuffer+i, &(App->AudioEngine.Songs+i)->SongMetadata, sizeof(song_metadata));
+    }
+
     return 0;
 }
 
@@ -409,10 +416,12 @@ void app_update(app* App) {
     if (App->Renderer.input.keys[L'j']) { 
         App->UIState.UICurrentSelectedSongIndex += 1; 
         App->UIState.UICurrentSelectedSongIndex %= App->AudioEngine.SongsCount;
+        App->Renderer.input.keys[L'j'] = false;
     }
     if (App->Renderer.input.keys[L'k']) { 
         App->UIState.UICurrentSelectedSongIndex -= 1; 
         App->UIState.UICurrentSelectedSongIndex %= App->AudioEngine.SongsCount;
+        App->Renderer.input.keys[L'k'] = false;
     }
     if (App->Renderer.input.keys[VK_RETURN]) {
         AudioEnginePlaySongAtIndex(&App->AudioEngine, App->UIState.UICurrentSelectedSongIndex);

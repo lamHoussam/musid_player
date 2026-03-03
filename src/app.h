@@ -30,8 +30,10 @@
 
 
 struct ui_state {
-    u64 UIVisualStartIndex;
-    u64 UICurrentSelectedSongIndex;
+    i64             UIVisualStartIndex;
+    i64             UICurrentSelectedSongIndex;
+    song_metadata*  MetadataToRenderBuffer;
+    i64             MetadataCount;
 };
 
 struct app

@@ -146,21 +146,21 @@ static i32 ParseSongDataFromWavFile(HANDLE FileHandle, song_data* OutSongData, b
                     ReadChunkData(FileHandle, Artist, chunkSize, currentPos);
                     u32 Size = min(MAX_PATH, chunkSize);
                     Artist[Size-1] = '\0';
-                    CharStr2WCharStr(Artist, OutSongData->Artist, Size);
+                    CharStr2WCharStr(Artist, OutSongData->SongMetadata.Artist, Size);
                     FoundMetaData |= 0x1;
                 } else if (chunkId == fourccINAM) {
                     char Title[MAX_PATH];
                     ReadChunkData(FileHandle, Title, chunkSize, currentPos);
                     u32 Size = min(MAX_PATH, chunkSize);
                     Title[Size-1] = '\0';
-                    CharStr2WCharStr(Title, OutSongData->SongName, Size);
+                    CharStr2WCharStr(Title, OutSongData->SongMetadata.SongName, Size);
                     FoundMetaData |= 0x1 << 1;
                 } else if (chunkId == fourccIPRD) {
                     char Album[MAX_PATH];
                     ReadChunkData(FileHandle, Album, chunkSize, currentPos);
                     u32 Size = min(MAX_PATH, chunkSize);
                     Album[Size-1] = '\0';
-                    CharStr2WCharStr(Album, OutSongData->Album, Size);
+                    CharStr2WCharStr(Album, OutSongData->SongMetadata.Album, Size);
                     FoundMetaData |= 0x1 << 2;
                 }
 
@@ -169,9 +169,9 @@ static i32 ParseSongDataFromWavFile(HANDLE FileHandle, song_data* OutSongData, b
                 if (chunkSize % 2 != 0) { currentPos++; }
                 bytesRead += sizeof(DWORD) * 2 + chunkSize;
             }
-            if ((FoundMetaData & 1) == 0) { wcsncpy(OutSongData->Artist, L"Unknown Artist", 14); }
-            if ((FoundMetaData & 2) == 0) { wcsncpy(OutSongData->SongName, L"Unknown", 7); }
-            if ((FoundMetaData & 4) == 0) { wcsncpy(OutSongData->Album, L"Unknown Album", 13); }
+            if ((FoundMetaData & 1) == 0) { wcsncpy(OutSongData->SongMetadata.Artist, L"Unknown Artist", 14); }
+            if ((FoundMetaData & 2) == 0) { wcsncpy(OutSongData->SongMetadata.SongName, L"Unknown", 7); }
+            if ((FoundMetaData & 4) == 0) { wcsncpy(OutSongData->SongMetadata.Album, L"Unknown Album", 13); }
 
 
         }
@@ -327,12 +327,14 @@ u8 LoadSongDataFromFile(const wchar_t* File, song_data* OutSongData, b32 LoadAud
 
     ParseSongDataFromWavFile(hFile, OutSongData, LoadAudioBuffer);
 
+    OutSongData->SongMetadata.DurationInSec = OutSongData->SongBufferSize / OutSongData->Wfx.nAvgBytesPerSec;
+
     // @NOTE: Read file metadata
     wchar_t* FileName = GetFileName(const_cast<wchar_t*>(File));
     size_t Size = min(wcslen(FileName), MAX_PATH)*sizeof(wchar_t);
     Size = min(wcslen(File), MAX_PATH)*sizeof(wchar_t);
-    memcpy_s(OutSongData->FilePath, sizeof(wchar_t)*MAX_PATH, File, Size);
-    OutSongData->FilePath[Size-1] = '\0';
+    memcpy_s(OutSongData->SongMetadata.FilePath, sizeof(wchar_t)*MAX_PATH, File, Size);
+    OutSongData->SongMetadata.FilePath[Size-1] = '\0';
 
     return 0;
 }
@@ -370,7 +372,7 @@ u8 _AudioEnginePlaySong(audio_engine* AudioEngine) {
     }
 
     if (!SongData->AudioBufferIsLoaded) {
-        _LoadSongAudioBufferFromFile(SongData->FilePath, SongData);
+        _LoadSongAudioBufferFromFile(SongData->SongMetadata.FilePath, SongData);
     }
 
     AudioEngine->xAudio2->CreateSourceVoice(&AudioEngine->xAudio2SourceVoice, (WAVEFORMATEX*)&SongData->Wfx, 0, XAUDIO2_DEFAULT_FREQ_RATIO, AudioEngine->VoiceCallback, NULL, NULL);
