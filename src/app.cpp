@@ -116,7 +116,7 @@ void RenderLayout_Library(app* App) {
     write_padded(r, colAlbum,  headerY, L"Album",       30, UI_HEADER);
     write_padded(r, colTime,   headerY, L"Time",        6,  UI_HEADER);
     write_padded(r, colFav,    headerY, UI_HEART_STR,   2,  UI_HEADER);
-    write_padded(r, colPlays,  headerY, L"Plays",       6,  UI_HEADER);
+    // write_padded(r, colPlays,  headerY, L"Plays",       6,  UI_HEADER);
 
     draw_hline(r, headerY + 1, 1, WIDTH - 2, UI_ACCENT);
 
@@ -151,14 +151,29 @@ void RenderLayout_Library(app* App) {
         wchar_t TimeText[32];
         swprintf(TimeText, 32, L"%02d:%02d", FloorMinDuration, RemainingSecs);
 
-        write_padded(r, colNum,    y, num,                                  4,  attr);
-        write_padded(r, colTitle,  y, SongData->SongName,                   60, attr);
-        write_padded(r, colArtist, y, SongData->Artist,                     35, attr);
-        write_padded(r, colAlbum,  y, SongData->Album,                      30, attr);
-        write_padded(r, colTime,   y, TimeText,                             6,  attr);
-        write_padded(r, colFav,    y, (i % 2 == 0) ? UI_HEART_STR : L"",    2,  attr);
+        write_padded(r, colNum,    y, num, 4,  attr);
+        write_padded(r, colTitle,  y, SongData->SongName, 60, attr);
+        write_padded(r, colArtist, y, SongData->Artist, 35, attr);
+        write_padded(r, colAlbum,  y, SongData->Album, 30, attr);
+        write_padded(r, colTime,   y, TimeText, 6, attr);
+        write_padded(r, colFav,    y, (i % 2 == 0) ? UI_HEART_STR : L"", 2, attr);
         // write_padded(r, colPlays,  y, L"213",                               6,  attr);
     }
+
+    // ========================================================
+    // HINTS
+    // ========================================================
+
+    write_padded(r, colPlays + 5, headerY + 2,  L"[j]       Down", 16, UI_ACCENT);
+    write_padded(r, colPlays + 5, headerY + 3,  L"[k]       Up", 14, UI_ACCENT);
+    write_padded(r, colPlays + 5, headerY + 4,  L"[SPACE]   Play/Pause", 22, UI_ACCENT);
+    write_padded(r, colPlays + 5, headerY + 5,  L"[/]       Search", 18, UI_ACCENT);
+    write_padded(r, colPlays + 5, headerY + 6,  L"[n]       Next", 16, UI_ACCENT);
+    write_padded(r, colPlays + 5, headerY + 7,  L"[p]       Previous", 20, UI_ACCENT);
+    write_padded(r, colPlays + 5, headerY + 8,  L"[ENTER]   Select", 17, UI_ACCENT);
+    write_padded(r, colPlays + 5, headerY + 9,  L"[u]       Volume up", 21, UI_ACCENT);
+    write_padded(r, colPlays + 5, headerY + 10,  L"[d]       Volume down", 23, UI_ACCENT);
+    write_padded(r, colPlays + 5, headerY + 11, L"[q]       Quit", 16, UI_ACCENT);
 
     // ========================================================
     // MINI PLAYER (46–49)
