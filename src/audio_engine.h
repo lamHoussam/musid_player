@@ -35,6 +35,7 @@ struct song_data {
 struct audio_engine {
     voice_callback* VoiceCallback;
     b8              IsPlaying;
+    b8              IsLooping;
 
     IXAudio2*               xAudio2{};
     IXAudio2SourceVoice*    xAudio2SourceVoice{};

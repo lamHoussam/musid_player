@@ -28,12 +28,27 @@
 #define COLOR_ACCENT    10
 #define COLOR_SELECTED  112
 
+enum ui_mode {
+    UI_MODE_NORMAL   = 0,
+    UI_MODE_SEARCH   = 1,
+};
+
 
 struct ui_state {
     i64             UIVisualStartIndex;
     i64             UICurrentSelectedSongIndex;
     song_metadata*  MetadataToRenderBuffer;
     i64             MetadataCount;
+    ui_mode         CurrentMode;
+    wchar_t         SearchString[16];
+    i8              SearchStringCurrentIndex;
+};
+
+struct playlist {
+    wchar_t Name[32];
+    i64     SongsCount;
+    i64     Capacity;
+    i64*    SongIndexList;
 };
 
 struct app
@@ -42,6 +57,7 @@ struct app
     ConsoleRenderer Renderer;
     ui_state        UIState;
     b8              IsRunning;
+    playlist        CurrentPlaylist; // Should have multiple playlists later
 };
 
 void    draw_header(ConsoleRenderer* c);
@@ -49,6 +65,10 @@ void    draw_playlist(app* App);
 void    draw_now_playing(app* App);
 void    draw_progress(app* App);
 void    draw_footer(ConsoleRenderer* c);
+
+u8      playlist_init(playlist* Playlist, i64 Capacity, const wchar_t* Name);
+u8      playlist_push(playlist* Playlist, i64 SongIndex);
+u8      playlist_removeAt(playlist* Playlist, i64 Index);
 
 u8      app_init(app* App);
 void    app_run(app* App);

@@ -201,13 +201,73 @@ u8 AudioEngineInit(audio_engine* AudioEngine) {
 
     // @NOTE: Not true
     AudioEngine->IsPlaying = true;
-    AudioEngine->CurrentSongIndex       = 0;
+    AudioEngine->IsLooping = false;
     // @NOTE: Check 
+    AudioEngine->CurrentSongIndex   = 0;
     AudioEngine->SongsCapacity      = 100;
     AudioEngine->SongsCount         = 0;
     AudioEngine->Songs = (song_data*)malloc(sizeof(song_data)*AudioEngine->SongsCapacity);
     AudioEngine->CurrentVolume = AUDIO_ENGINE_MAX_VOLUME;
 
+    return 0;
+}
+
+// @NOTE: Maybe do it differently
+u8 _UnloadFirstLoadedSongThatIsNotPlaying(audio_engine* AudioEngine) {
+    for (u64 i = 0; i < AudioEngine->SongsCount; ++i) {
+        song_data* SongData = AudioEngine->Songs+i;
+        if (AudioEngine->CurrentSongIndex != i && SongData->AudioBufferIsLoaded) {
+            return AudioEngineUnloadSongAudioBuffer(AudioEngine, i);
+        }
+    }
+    return 1;
+}
+
+static i32 _LoadSongAudioBufferFromFile(wchar_t* File, song_data* OutSongData) {
+    HANDLE hFile = CreateFileW(
+        File,
+        GENERIC_READ,
+        FILE_SHARE_READ,
+        NULL,
+        OPEN_EXISTING,
+        0,
+        NULL);
+
+    if( INVALID_HANDLE_VALUE == hFile )
+        return HRESULT_FROM_WIN32( GetLastError() );
+
+    if( INVALID_SET_FILE_POINTER == SetFilePointer( hFile, 0, NULL, FILE_BEGIN ) )
+        return HRESULT_FROM_WIN32( GetLastError() );
+    
+    return _LoadSongAudioBufferFromFileHandle(hFile, OutSongData);
+}
+
+u8 _AudioEngineReplaySong(audio_engine* AudioEngine) {
+    song_data* SongData = AudioEngine->Songs+AudioEngine->CurrentSongIndex;
+    AudioEngine->xAudio2SourceVoice->SubmitSourceBuffer(&SongData->AudioBuffer);
+    AudioEngine->xAudio2SourceVoice->Start(0);
+    return 0;
+}
+
+u8 _AudioEnginePlaySong(audio_engine* AudioEngine) {
+    song_data* SongData = AudioEngine->Songs+AudioEngine->CurrentSongIndex;
+
+    if (AudioEngine->xAudio2SourceVoice != nullptr) {
+        AudioEngine->xAudio2SourceVoice->DestroyVoice();
+    }
+
+    if (!SongData->AudioBufferIsLoaded) {
+        _LoadSongAudioBufferFromFile(SongData->SongMetadata.FilePath, SongData);
+    }
+
+    AudioEngine->xAudio2->CreateSourceVoice(&AudioEngine->xAudio2SourceVoice, (WAVEFORMATEX*)&SongData->Wfx, 0, XAUDIO2_DEFAULT_FREQ_RATIO, AudioEngine->VoiceCallback, NULL, NULL);
+
+    AudioEngine->xAudio2SourceVoice->SubmitSourceBuffer(&SongData->AudioBuffer);
+    AudioEngine->xAudio2SourceVoice->Start(0);
+
+    _UnloadFirstLoadedSongThatIsNotPlaying(AudioEngine);
+
+    printf("Started playing %lld\n", AudioEngine->CurrentSongIndex);
     return 0;
 }
 
@@ -217,7 +277,8 @@ void AudioEngineUpdate(audio_engine* AudioEngine) {
     AudioEngine->xAudioMasteringVoice->SetVolume(FloatVolume);
     if (WaitForSingleObject(AudioEngine->VoiceCallback->hBufferEndEvent, 0) == WAIT_OBJECT_0) { 
         printf("I have awaited properly\n");
-        AudioEnginePlayNext(AudioEngine); 
+        if (AudioEngine->IsLooping) { _AudioEngineReplaySong(AudioEngine); } 
+        else { AudioEnginePlayNext(AudioEngine); }
         printf("Started playing %lld\n", AudioEngine->CurrentSongIndex);
         ResetEvent(AudioEngine->VoiceCallback->hBufferEndEvent);
     }
@@ -241,25 +302,6 @@ u8 AudioEngineTogglePlayPause(audio_engine* AudioEngine) {
 }
 
 
-
-static i32 _LoadSongAudioBufferFromFile(wchar_t* File, song_data* OutSongData) {
-    HANDLE hFile = CreateFileW(
-        File,
-        GENERIC_READ,
-        FILE_SHARE_READ,
-        NULL,
-        OPEN_EXISTING,
-        0,
-        NULL);
-
-    if( INVALID_HANDLE_VALUE == hFile )
-        return HRESULT_FROM_WIN32( GetLastError() );
-
-    if( INVALID_SET_FILE_POINTER == SetFilePointer( hFile, 0, NULL, FILE_BEGIN ) )
-        return HRESULT_FROM_WIN32( GetLastError() );
-    
-    return _LoadSongAudioBufferFromFileHandle(hFile, OutSongData);
-}
 
 u8 AudioEngineUnloadSongAudioBuffer(audio_engine* AudioEngine, u64 SongIndex) {
     song_data* SongData = AudioEngine->Songs+SongIndex;
@@ -350,39 +392,6 @@ u8 AudioEngineLoadSong(audio_engine* AudioEngine, const wchar_t* SongName) {
         }
     }
 
-    return 0;
-}
-
-// @NOTE: Maybe do it differently
-u8 _UnloadFirstLoadedSongThatIsNotPlaying(audio_engine* AudioEngine) {
-    for (u64 i = 0; i < AudioEngine->SongsCount; ++i) {
-        song_data* SongData = AudioEngine->Songs+i;
-        if (AudioEngine->CurrentSongIndex != i && SongData->AudioBufferIsLoaded) {
-            return AudioEngineUnloadSongAudioBuffer(AudioEngine, i);
-        }
-    }
-    return 1;
-}
-
-u8 _AudioEnginePlaySong(audio_engine* AudioEngine) {
-    song_data* SongData = AudioEngine->Songs+AudioEngine->CurrentSongIndex;
-
-    if (AudioEngine->xAudio2SourceVoice != nullptr) {
-        AudioEngine->xAudio2SourceVoice->DestroyVoice();
-    }
-
-    if (!SongData->AudioBufferIsLoaded) {
-        _LoadSongAudioBufferFromFile(SongData->SongMetadata.FilePath, SongData);
-    }
-
-    AudioEngine->xAudio2->CreateSourceVoice(&AudioEngine->xAudio2SourceVoice, (WAVEFORMATEX*)&SongData->Wfx, 0, XAUDIO2_DEFAULT_FREQ_RATIO, AudioEngine->VoiceCallback, NULL, NULL);
-
-    AudioEngine->xAudio2SourceVoice->SubmitSourceBuffer(&SongData->AudioBuffer);
-    AudioEngine->xAudio2SourceVoice->Start(0);
-
-    _UnloadFirstLoadedSongThatIsNotPlaying(AudioEngine);
-
-    printf("Started playing %lld\n", AudioEngine->CurrentSongIndex);
     return 0;
 }
 

@@ -57,10 +57,56 @@ static void write_padded(ConsoleRenderer* r, i32 x, i32 y, const wchar_t* text, 
     for (i32 i = copy; i < width; ++i) { console_put(r, x + i, y, L' ', attr); }
 }
 
-// ------------------------------------------------------------
-// MAIN RENDER FUNCTION
-// ------------------------------------------------------------
 
+void render_miniplayer(app* App, i32 BottomTop, i32 BottomBottom) {
+    draw_box(&App->Renderer, 0, BottomTop, WIDTH - 1, BottomBottom, UI_ACCENT);
+
+    u64 SamplesPlayed = 0;
+    if (App->AudioEngine.xAudio2SourceVoice != nullptr) {
+        XAUDIO2_VOICE_STATE State;
+        App->AudioEngine.xAudio2SourceVoice->GetState(&State);
+        SamplesPlayed = State.SamplesPlayed;
+    }
+
+    song_data* CurrentSong  = App->AudioEngine.Songs+App->AudioEngine.CurrentSongIndex;
+    i32 DurationInSec       = CurrentSong->SongBufferSize / CurrentSong->Wfx.nAvgBytesPerSec;
+    u64 CurrentTimeInSec    = SamplesPlayed / CurrentSong->Wfx.nSamplesPerSec;
+    i32 CurrentFloorMinDuration = CurrentTimeInSec / 60;
+    i32 CurrentRemainingSecs    = CurrentTimeInSec % 60;
+    i32 FloorMinDuration        = DurationInSec / 60;
+    i32 RemainingSecs           = DurationInSec % 60;
+
+    wchar_t TimeText[32];
+    swprintf(TimeText, 32, L"%02d:%02d", CurrentFloorMinDuration, CurrentRemainingSecs);
+
+    write_padded(&App->Renderer, 2, BottomTop + 1,
+        TimeText,
+        6,
+        UI_TEXT);
+
+    // Progress bar
+    i32 barStart = 10;
+    i32 barWidth = 60;
+
+    i32 filled = (i32)((f32)barWidth * (1.0f*CurrentTimeInSec/DurationInSec));
+    for (i32 i = 0; i < barWidth; ++i) {
+        wchar_t ch = (i < filled) ? UI_BLOCK_FULL : UI_BLOCK_LIGHT;
+        console_put(&App->Renderer, barStart + i, BottomTop + 1, ch, UI_ACCENT);
+    }
+
+    swprintf(TimeText, 32, L"%02d:%02d", FloorMinDuration, RemainingSecs);
+    write_padded(&App->Renderer, barStart + barWidth + 2, BottomTop + 1,
+        TimeText,
+        6,
+        UI_TEXT);
+
+
+}
+
+
+// ------------------------------------------------------------
+// LAYOUT 1: Library
+// ------------------------------------------------------------
 void RenderLayout_Library(app* App) {
 
     ConsoleRenderer* r = &App->Renderer;
@@ -82,9 +128,12 @@ void RenderLayout_Library(app* App) {
         40,
         UI_HEADER);
 
+    wchar_t SearchUI[28];
+    swprintf(SearchUI, 28, L"Search: [%s]", App->UIState.SearchString);
+
     write_padded(r, WIDTH - 60, 1,
-        L"Search: [__________]   Sort: Artist ▼",
-        58,
+        SearchUI,
+        28,
         UI_TEXT);
 
     // ========================================================
@@ -167,13 +216,15 @@ void RenderLayout_Library(app* App) {
     write_padded(r, colPlays + 5, headerY + 2,  L"[j]       Down", 16, UI_ACCENT);
     write_padded(r, colPlays + 5, headerY + 3,  L"[k]       Up", 14, UI_ACCENT);
     write_padded(r, colPlays + 5, headerY + 4,  L"[SPACE]   Play/Pause", 22, UI_ACCENT);
-    write_padded(r, colPlays + 5, headerY + 5,  L"[/]       Search", 18, UI_ACCENT);
-    write_padded(r, colPlays + 5, headerY + 6,  L"[n]       Next", 16, UI_ACCENT);
-    write_padded(r, colPlays + 5, headerY + 7,  L"[p]       Previous", 20, UI_ACCENT);
-    write_padded(r, colPlays + 5, headerY + 8,  L"[ENTER]   Select", 17, UI_ACCENT);
-    write_padded(r, colPlays + 5, headerY + 9,  L"[u]       Volume up", 21, UI_ACCENT);
-    write_padded(r, colPlays + 5, headerY + 10,  L"[d]       Volume down", 23, UI_ACCENT);
-    write_padded(r, colPlays + 5, headerY + 11, L"[q]       Quit", 16, UI_ACCENT);
+    write_padded(r, colPlays + 5, headerY + 5,  L"[/]       Search Mode", 23, UI_ACCENT);
+    write_padded(r, colPlays + 5, headerY + 6,  L"[Esc]     Normal Mode", 23, UI_ACCENT);
+    write_padded(r, colPlays + 5, headerY + 7,  L"[n]       Next", 16, UI_ACCENT);
+    write_padded(r, colPlays + 5, headerY + 8,  L"[p]       Previous", 20, UI_ACCENT);
+    write_padded(r, colPlays + 5, headerY + 9,  L"[ENTER]   Select", 17, UI_ACCENT);
+    write_padded(r, colPlays + 5, headerY + 10, L"[u]       Volume up", 21, UI_ACCENT);
+    write_padded(r, colPlays + 5, headerY + 11, L"[d]       Volume down", 23, UI_ACCENT);
+    write_padded(r, colPlays + 5, headerY + 12, L"[l]       Loop", 15, UI_ACCENT);
+    write_padded(r, colPlays + 5, headerY + 13, L"[q]       Quit", 16, UI_ACCENT);
 
     // ========================================================
     // MINI PLAYER (46–49)
@@ -182,46 +233,7 @@ void RenderLayout_Library(app* App) {
     const i32 bottomTop = 46;
     const i32 bottomBottom = HEIGHT - 1;
 
-    draw_box(r, 0, bottomTop, WIDTH - 1, bottomBottom, UI_ACCENT);
-
-    u64 SamplesPlayed = 0;
-    if (App->AudioEngine.xAudio2SourceVoice != nullptr) {
-        XAUDIO2_VOICE_STATE State;
-        App->AudioEngine.xAudio2SourceVoice->GetState(&State);
-        SamplesPlayed = State.SamplesPlayed;
-    }
-
-    song_data* CurrentSong  = AudioEngine->Songs+AudioEngine->CurrentSongIndex;
-    i32 DurationInSec       = CurrentSong->SongBufferSize / CurrentSong->Wfx.nAvgBytesPerSec;
-    u64 CurrentTimeInSec    = SamplesPlayed / CurrentSong->Wfx.nSamplesPerSec;
-    i32 CurrentFloorMinDuration = CurrentTimeInSec / 60;
-    i32 CurrentRemainingSecs    = CurrentTimeInSec % 60;
-    i32 FloorMinDuration        = DurationInSec / 60;
-    i32 RemainingSecs           = DurationInSec % 60;
-
-    wchar_t TimeText[32];
-    swprintf(TimeText, 32, L"%02d:%02d", CurrentFloorMinDuration, CurrentRemainingSecs);
-
-    write_padded(r, 2, bottomTop + 1,
-        TimeText,
-        6,
-        UI_TEXT);
-
-    // Progress bar
-    i32 barStart = 10;
-    i32 barWidth = 60;
-
-    i32 filled = (i32)((f32)barWidth * (1.0f*CurrentTimeInSec/DurationInSec));
-    for (i32 i = 0; i < barWidth; ++i) {
-        wchar_t ch = (i < filled) ? UI_BLOCK_FULL : UI_BLOCK_LIGHT;
-        console_put(r, barStart + i, bottomTop + 1, ch, UI_ACCENT);
-    }
-
-    swprintf(TimeText, 32, L"%02d:%02d", FloorMinDuration, RemainingSecs);
-    write_padded(r, barStart + barWidth + 2, bottomTop + 1,
-        TimeText,
-        6,
-        UI_TEXT);
+    render_miniplayer(App, bottomTop, bottomBottom);
 
     wchar_t ControlText[15];
     swprintf(ControlText, 15, L"%lc  %lc  %lc", UI_PREVIOUS, UI_PLAY_PAUSE, UI_NEXT);
@@ -236,8 +248,8 @@ void RenderLayout_Library(app* App) {
         6,
         UI_TEXT);
 
-    barStart = 136;
-    barWidth = 10;
+    i32 barStart = 136;
+    i32 barWidth = 10;
     for (i32 i = 0; i < barWidth; ++i) {
         wchar_t ch = (i < AudioEngine->CurrentVolume) ? UI_BLOCK_FULL : UI_BLOCK_LIGHT;
         console_put(r, barStart + i, bottomTop + 1, ch, UI_ACCENT);
@@ -264,6 +276,155 @@ void RenderLayout_Library(app* App) {
     }
 }
 
+
+// ------------------------------------------------------------
+// LAYOUT 2: Playlist
+// ------------------------------------------------------------
+
+void RenderLayout_Playlist(app* App) {
+    ConsoleRenderer* r = &App->Renderer;
+    playlist* CurrentPlaylist = &App->CurrentPlaylist;
+
+    console_clear(r, L' ', UI_BG);
+
+    // ========================================================
+    // TOP BAR (0–2)
+    // ========================================================
+
+    draw_box(r, 0, 0, WIDTH - 1, 2, UI_ACCENT);
+
+    wchar_t Title[64];
+    swprintf(Title, 64, L"PLAYLIST: %ls (%lld Tracks)", CurrentPlaylist->Name, CurrentPlaylist->SongsCount);
+
+    write_padded(r, 2, 1, Title, 64, UI_HEADER);
+
+    // @NOTE
+    // write_padded(r, WIDTH - 50, 1,
+    //     L"Shuffle ON | Total 2h 31m",
+    //     48,
+    //     UI_TEXT);
+
+    // ========================================================
+    // MAIN AREA (3–42)
+    // ========================================================
+
+    const int mainTop    = 3;
+    const int mainBottom = 42;
+
+    draw_box(r, 0, mainTop, WIDTH - 1, mainBottom, UI_ACCENT);
+
+    // Split positions
+    const int splitX = 130;
+
+    // Vertical separator
+    draw_vline(r, splitX, mainTop + 1, mainBottom - 1, UI_ACCENT);
+
+    // --------------------------------------------------------
+    // LEFT: TRACK LIST
+    // --------------------------------------------------------
+
+    int listLeft   = 2;
+    int listRight  = splitX - 2;
+    int listTop    = mainTop + 1;
+
+    write_padded(r, listLeft, listTop,
+        L"TRACK LIST",
+        20,
+        UI_HEADER);
+
+
+
+    // @NOTE: Use previous layout code
+    int selectedIndex = 1;
+    int playingIndex  = 0;
+
+    for (int i = 0; i < CurrentPlaylist->SongsCount; ++i)
+    {
+        int y = listTop + 2 + i;
+
+        WORD attr = UI_TEXT;
+
+        if (i == playingIndex) { attr = UI_PLAYING; }
+        if (i == selectedIndex) { attr = UI_SELECTED; }
+
+        wchar_t line[128];
+
+        song_metadata* SongMetadata = &(App->AudioEngine.Songs+CurrentPlaylist->SongIndexList[i])->SongMetadata;
+
+        if (i == playingIndex) {
+            swprintf(line, 128, L"%lc %02d  %ls", UI_PLAY, i + 1, SongMetadata->SongName);
+        }
+        else {
+            swprintf(line, 128, L"  %02d  %ls", i + 1, SongMetadata->SongName);
+        }
+
+        write_padded(r, listLeft, y, line, listRight - listLeft, attr);
+    }
+
+    // --------------------------------------------------------
+    // RIGHT: NOW PLAYING PANEL
+    // --------------------------------------------------------
+
+    int panelLeft = splitX + 2;
+    int panelTop  = mainTop + 1;
+
+    // @BACK
+    // write_padded(r, panelLeft, panelTop,
+    //     L"NOW PLAYING",
+    //     20,
+    //     UI_HEADER);
+
+    // write_padded(r, panelLeft, panelTop + 2,
+    //     L"Slipknot",
+    //     30,
+    //     UI_PLAYING);
+
+    // write_padded(r, panelLeft, panelTop + 3,
+    //     L"Vermilion, Pt. 2",
+    //     40,
+    //     UI_TEXT);
+
+    draw_hline(r, panelTop + 5, panelLeft, WIDTH - 3, UI_DIM);
+
+    // write_padded(r, panelLeft, panelTop + 7,  L"Album: Vol. 3",       40, UI_TEXT);
+    // write_padded(r, panelLeft, panelTop + 8,  L"Year: 2004",          40, UI_TEXT);
+    // write_padded(r, panelLeft, panelTop + 9,  L"Genre: Metal",        40, UI_TEXT);
+    // write_padded(r, panelLeft, panelTop + 10, L"Bitrate: 320kbps",    40, UI_TEXT);
+    // write_padded(r, panelLeft, panelTop + 11, L"Sample Rate: 44.1kHz",40, UI_TEXT);
+    // write_padded(r, panelLeft, panelTop + 12, L"Plays: 213",          40, UI_TEXT);
+
+    // ========================================================
+    // BOTTOM CONTROLS (43–49)
+    // ========================================================
+
+    const int bottomTop    = 43;
+    const int bottomBottom = HEIGHT - 1;
+
+    draw_box(r, 0, bottomTop, WIDTH - 1, bottomBottom, UI_ACCENT);
+
+    // Large progress bar
+    write_padded(r, 2, bottomTop + 1, L"03:12", 6, UI_TEXT);
+
+    int barStart = 10;
+    int barWidth = 120;
+    int filled   = 60;
+
+    for (int i = 0; i < barWidth; ++i)
+    {
+        wchar_t ch = (i < filled) ? UI_BLOCK_FULL : UI_BLOCK_LIGHT;
+        console_put(r, barStart + i, bottomTop + 1, ch, UI_ACCENT);
+    }
+
+    write_padded(r, barStart + barWidth + 2, bottomTop + 1, L"05:44", 6, UI_TEXT);
+
+    // Media controls
+    write_padded(r, 60, bottomTop + 3,
+        L"⏮   ⏯   ⏭      ↻ Shuffle      ↺ Repeat      Vol ███████░░░ 65%",
+        90,
+        UI_TEXT);
+
+    console_render(r);
+}
 
 
 // @NOTE: End
@@ -386,9 +547,42 @@ void draw_original_layout(app* App) {
 
 }
 
+/////////////////////////////////
+//  PLAYLIST
+/////////////////////////////////
+u8 playlist_init(playlist* Playlist, i64 Capacity, const wchar_t* Name) {
+    wcsncpy(Playlist->Name, Name, 32);
+    Playlist->SongIndexList = (i64*)malloc(sizeof(i64)*Capacity);
+    Playlist->Capacity      = Capacity;
+    Playlist->SongsCount    = 0;
+
+    return 0;
+}
+
+u8 playlist_push(playlist* Playlist, i64 SongIndex) {
+    // Allocate more
+    if (Playlist->SongsCount >= Playlist->Capacity) { return 1; }
+    Playlist->SongIndexList[Playlist->SongsCount++] = SongIndex;
+    return 0;
+}
+
+u8 playlist_removeAt(playlist* Playlist, i64 Index) {
+    if (Playlist->SongsCount == 0) { return 1; }
+    Playlist->SongIndexList[Index] = -1;
+    for (i64 i = Index + 1; i < Playlist->SongsCount; ++i) {
+        Playlist->SongIndexList[i-1] = Playlist->SongIndexList[i];
+    }
+    Playlist->SongsCount--;
+    return 0;
+}
+
+
+
+
+
+
 u8 app_init(app* App) {
     console_init(&App->Renderer);
-    console_clear(&App->Renderer, L' ', 0);
 
     AudioEngineInit(&App->AudioEngine);
     AudioEngineLoadSongsFromFolder(&App->AudioEngine, SONGS_FOLDER);
@@ -399,6 +593,16 @@ u8 app_init(app* App) {
 
     App->UIState.MetadataToRenderBuffer = (song_metadata*)malloc(sizeof(song_metadata)*App->AudioEngine.SongsCount);
     App->UIState.MetadataCount          = App->AudioEngine.SongsCount;
+    App->UIState.CurrentMode            = UI_MODE_NORMAL;
+    wcsncpy(App->UIState.SearchString, L"                ", 16);
+    App->UIState.SearchStringCurrentIndex = 0;
+
+    playlist_init(&App->CurrentPlaylist, App->AudioEngine.SongsCount, L"TestPlaylist");
+
+    playlist_push(&App->CurrentPlaylist, 0);
+    playlist_push(&App->CurrentPlaylist, 5);
+    playlist_push(&App->CurrentPlaylist, 10);
+    playlist_push(&App->CurrentPlaylist, 3);
 
     for (i64 i = 0; i < App->UIState.MetadataCount; ++i) {
         memcpy(App->UIState.MetadataToRenderBuffer+i, &(App->AudioEngine.Songs+i)->SongMetadata, sizeof(song_metadata));
@@ -420,31 +624,70 @@ void app_update(app* App) {
     console_clear(&App->Renderer, L' ', COLOR_DEFAULT);
     console_process_input(&App->Renderer);
 
-    if (App->Renderer.input.keys[L'n']) { AudioEnginePlayNext(&App->AudioEngine); }
-    if (App->Renderer.input.keys[L'p']) { AudioEnginePlayPrev(&App->AudioEngine); }
-    if (App->Renderer.input.keys[L' ']) { AudioEngineTogglePlayPause(&App->AudioEngine); }
-    if (App->Renderer.input.keys[L'q']) { App->IsRunning = false; }
-    if (App->Renderer.input.keys[L's']) { AudioEnginePause(&App->AudioEngine); }
-    if (App->Renderer.input.keys[L'u']) { App->AudioEngine.CurrentVolume++; }
-    if (App->Renderer.input.keys[L'd']) { App->AudioEngine.CurrentVolume--; }
+    if (App->Renderer.input.keys[VK_ESCAPE]) {
+        App->UIState.CurrentMode = UI_MODE_NORMAL;
+        App->Renderer.input.keys[VK_ESCAPE] = false;
+    }
 
-    if (App->Renderer.input.keys[L'j']) { 
-        App->UIState.UICurrentSelectedSongIndex += 1; 
-        App->UIState.UICurrentSelectedSongIndex %= App->AudioEngine.SongsCount;
-        App->Renderer.input.keys[L'j'] = false;
+    if (App->Renderer.input.keys[L'/']) {
+        App->UIState.CurrentMode = UI_MODE_SEARCH;
+        App->Renderer.input.keys[L'/'] = false;
     }
-    if (App->Renderer.input.keys[L'k']) { 
-        App->UIState.UICurrentSelectedSongIndex -= 1; 
-        App->UIState.UICurrentSelectedSongIndex %= App->AudioEngine.SongsCount;
-        App->Renderer.input.keys[L'k'] = false;
+
+    switch (App->UIState.CurrentMode)
+    {
+    case UI_MODE_NORMAL: {
+
+        if (App->Renderer.input.keys[L'n']) { AudioEnginePlayNext(&App->AudioEngine); }
+        if (App->Renderer.input.keys[L'p']) { AudioEnginePlayPrev(&App->AudioEngine); }
+        if (App->Renderer.input.keys[L' ']) { AudioEngineTogglePlayPause(&App->AudioEngine); }
+        if (App->Renderer.input.keys[L'q']) { App->IsRunning = false; }
+        if (App->Renderer.input.keys[L's']) { AudioEnginePause(&App->AudioEngine); }
+        if (App->Renderer.input.keys[L'u']) { App->AudioEngine.CurrentVolume++; }
+        if (App->Renderer.input.keys[L'd']) { App->AudioEngine.CurrentVolume--; }
+        if (App->Renderer.input.keys[L'l']) { App->AudioEngine.IsLooping = !App->AudioEngine.IsLooping; }
+
+        if (App->Renderer.input.keys[L'j']) { 
+            App->UIState.UICurrentSelectedSongIndex += 1; 
+            App->UIState.UICurrentSelectedSongIndex %= App->AudioEngine.SongsCount;
+            App->Renderer.input.keys[L'j'] = false;
+        }
+        if (App->Renderer.input.keys[L'k']) { 
+            App->UIState.UICurrentSelectedSongIndex -= 1; 
+            App->UIState.UICurrentSelectedSongIndex %= App->AudioEngine.SongsCount;
+            App->Renderer.input.keys[L'k'] = false;
+        }
+        if (App->Renderer.input.keys[VK_RETURN]) {
+            AudioEnginePlaySongAtIndex(&App->AudioEngine, App->UIState.UICurrentSelectedSongIndex);
+            App->Renderer.input.keys[VK_RETURN] = false;
+        }
+
+    } break;
+    case UI_MODE_SEARCH: {
+        if (App->UIState.SearchStringCurrentIndex < 16) {
+            for (i32 i = 0; i < LH_KEYS_COUNT; ++i) {
+                if (isalpha(i) && App->Renderer.input.keys[i]) {
+                    App->UIState.SearchString[App->UIState.SearchStringCurrentIndex] = (wchar_t)((char)i);
+                    App->UIState.SearchStringCurrentIndex++;
+                    App->Renderer.input.keys[i] = false;
+                    break;
+                }
+            }
+        }
+
+        if (App->UIState.SearchStringCurrentIndex > 0 && App->Renderer.input.keys[VK_BACK]) {
+            App->UIState.SearchString[App->UIState.SearchStringCurrentIndex-1] = L' ';
+            App->UIState.SearchStringCurrentIndex--;
+            App->Renderer.input.keys[VK_BACK] = false;
+        }
+
+    } break;
     }
-    if (App->Renderer.input.keys[VK_RETURN]) {
-        AudioEnginePlaySongAtIndex(&App->AudioEngine, App->UIState.UICurrentSelectedSongIndex);
-        App->Renderer.input.keys[VK_RETURN] = false;
-    }
+
 
     AudioEngineUpdate(&App->AudioEngine);
     RenderLayout_Library(App);
+    // RenderLayout_Playlist(App);
 
 
     // render_bounds(&App->Renderer);
