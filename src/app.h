@@ -33,6 +33,11 @@ enum ui_mode {
     UI_MODE_SEARCH   = 1,
 };
 
+enum ui_layout {
+    UI_LAYOUT_LIBRARY   = 0,
+    UI_LAYOUT_PLAYLIST  = 1,
+};
+
 
 struct ui_state {
     i64             UIVisualStartIndex;
@@ -42,6 +47,7 @@ struct ui_state {
     ui_mode         CurrentMode;
     wchar_t         SearchString[16];
     i8              SearchStringCurrentIndex;
+    ui_layout       CurrentLayout;
 };
 
 struct playlist {

@@ -224,7 +224,9 @@ void RenderLayout_Library(app* App) {
     write_padded(r, colPlays + 5, headerY + 10, L"[u]       Volume up", 21, UI_ACCENT);
     write_padded(r, colPlays + 5, headerY + 11, L"[d]       Volume down", 23, UI_ACCENT);
     write_padded(r, colPlays + 5, headerY + 12, L"[l]       Loop", 15, UI_ACCENT);
-    write_padded(r, colPlays + 5, headerY + 13, L"[q]       Quit", 16, UI_ACCENT);
+    write_padded(r, colPlays + 5, headerY + 13, L"[a]       Add to playlist", 26, UI_ACCENT);
+    write_padded(r, colPlays + 5, headerY + 14, L"[s]       Switch Layout", 24, UI_ACCENT);
+    write_padded(r, colPlays + 5, headerY + 15, L"[q]       Quit", 16, UI_ACCENT);
 
     // ========================================================
     // MINI PLAYER (46–49)
@@ -594,6 +596,7 @@ u8 app_init(app* App) {
     App->UIState.MetadataToRenderBuffer = (song_metadata*)malloc(sizeof(song_metadata)*App->AudioEngine.SongsCount);
     App->UIState.MetadataCount          = App->AudioEngine.SongsCount;
     App->UIState.CurrentMode            = UI_MODE_NORMAL;
+    App->UIState.CurrentLayout          = UI_LAYOUT_LIBRARY;
     wcsncpy(App->UIState.SearchString, L"                ", 16);
     App->UIState.SearchStringCurrentIndex = 0;
 
@@ -642,10 +645,15 @@ void app_update(app* App) {
         if (App->Renderer.input.keys[L'p']) { AudioEnginePlayPrev(&App->AudioEngine); }
         if (App->Renderer.input.keys[L' ']) { AudioEngineTogglePlayPause(&App->AudioEngine); }
         if (App->Renderer.input.keys[L'q']) { App->IsRunning = false; }
-        if (App->Renderer.input.keys[L's']) { AudioEnginePause(&App->AudioEngine); }
+        if (App->Renderer.input.keys[L's']) {
+            App->UIState.CurrentLayout = (ui_layout)((App->UIState.CurrentLayout+1)%2);
+        }
         if (App->Renderer.input.keys[L'u']) { App->AudioEngine.CurrentVolume++; }
         if (App->Renderer.input.keys[L'd']) { App->AudioEngine.CurrentVolume--; }
         if (App->Renderer.input.keys[L'l']) { App->AudioEngine.IsLooping = !App->AudioEngine.IsLooping; }
+        if (App->Renderer.input.keys[L'a']) { 
+            playlist_push(&App->CurrentPlaylist, App->UIState.UICurrentSelectedSongIndex);
+        }
 
         if (App->Renderer.input.keys[L'j']) { 
             App->UIState.UICurrentSelectedSongIndex += 1; 
@@ -685,12 +693,13 @@ void app_update(app* App) {
     }
 
 
+    switch (App->UIState.CurrentLayout)
+    {
+    case UI_LAYOUT_LIBRARY: { RenderLayout_Library(App); } break;
+    case UI_LAYOUT_PLAYLIST: { RenderLayout_Playlist(App); } break;
+    }
+
     AudioEngineUpdate(&App->AudioEngine);
-    RenderLayout_Library(App);
-    // RenderLayout_Playlist(App);
-
-
-    // render_bounds(&App->Renderer);
     console_render(&App->Renderer);
 }
 
