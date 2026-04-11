@@ -69,8 +69,8 @@ void render_miniplayer(app* App, i32 BottomTop, i32 BottomBottom) {
     }
 
     song_data* CurrentSong  = App->AudioEngine.Songs+App->AudioEngine.CurrentSongIndex;
-    i32 DurationInSec       = CurrentSong->SongBufferSize / CurrentSong->Wfx.nAvgBytesPerSec;
-    u64 CurrentTimeInSec    = SamplesPlayed / CurrentSong->Wfx.nSamplesPerSec;
+    i32 DurationInSec       = GetSongBufferDurationInSec(&CurrentSong->SongBufferData);
+    u64 CurrentTimeInSec    = SamplesPlayed / CurrentSong->SongBufferData.SamplesPerSec;
     i32 CurrentFloorMinDuration = CurrentTimeInSec / 60;
     i32 CurrentRemainingSecs    = CurrentTimeInSec % 60;
     i32 FloorMinDuration        = DurationInSec / 60;
@@ -493,12 +493,12 @@ void draw_progress(app* App) {
     i32 barWidth = WIDTH - 40;
     song_data* CurrentSong = App->AudioEngine.Songs+App->AudioEngine.CurrentSongIndex;
     
-    u64 CurrentTimeInSec = SamplesPlayed / CurrentSong->Wfx.nSamplesPerSec;
+    u64 CurrentTimeInSec = SamplesPlayed / CurrentSong->SongBufferData.SamplesPerSec;
 
     i32 y = PROGRESS_TOP + 2;
     i32 x = 5;
 
-    i32 DurationInSec       = CurrentSong->SongBufferSize / CurrentSong->Wfx.nAvgBytesPerSec;
+    i32 DurationInSec       = GetSongBufferDurationInSec(&CurrentSong->SongBufferData);
     i32 FloorMinDuration    = DurationInSec / 60;
     i32 RemainingSecs       = DurationInSec % 60;
 

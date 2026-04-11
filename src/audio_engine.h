@@ -23,19 +23,30 @@ struct song_metadata {
     i32     DurationInSec;
 };
 
+struct song_buffer {
+    u8*     Data;
+    u64     BufferSize;
+
+    u16     Channels;
+    u32     SamplesPerSec;
+    u32     NumAvgBytesPerSec;
+    u16     BlockAlign;
+    u16     BitsPerSample;
+};
+
 struct song_data {
-    XAUDIO2_BUFFER  AudioBuffer;
-    WAVEFORMATEX    Wfx;
-    u64             SongBufferSize;
-    void*           SongBuffer;
+    song_buffer     SongBufferData;
     song_metadata   SongMetadata;
     b8              AudioBufferIsLoaded;
 };
 
+struct platform_audio;
 struct audio_engine {
     voice_callback* VoiceCallback;
     b8              IsPlaying;
     b8              IsLooping;
+
+    XAUDIO2_BUFFER      AudioBuffer;
 
     IXAudio2*               xAudio2{};
     IXAudio2SourceVoice*    xAudio2SourceVoice{};
@@ -62,6 +73,8 @@ u8 AudioEngineTogglePlayPause(audio_engine* AudioEngine);
 u8 AudioEnginePlayNext(audio_engine* AudioEngine);
 u8 AudioEnginePlayPrev(audio_engine* AudioEngine);
 u8 AudioEnginePlaySongAtIndex(audio_engine* AudioEngine, u64 Index);
+
+i32 GetSongBufferDurationInSec(const song_buffer* SongBuffer);
 
 struct voice_callback : public IXAudio2VoiceCallback {
 public: 
