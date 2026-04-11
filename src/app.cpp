@@ -121,7 +121,7 @@ void RenderLayout_Library(app* App) {
     draw_box(r, 0, 0, WIDTH - 1, 2, UI_ACCENT);
 
     wchar_t LibraryTitle[40];
-    swprintf(LibraryTitle, 40, L"LIBRARY - %lld Tracks", AudioEngine->SongsCount);
+    swprintf(LibraryTitle, 40, L"LIBRARY - %d Tracks", AudioEngine->SongsCount);
 
     write_padded(r, 2, 1,
         LibraryTitle,
@@ -296,7 +296,7 @@ void RenderLayout_Playlist(app* App) {
     draw_box(r, 0, 0, WIDTH - 1, 2, UI_ACCENT);
 
     wchar_t Title[64];
-    swprintf(Title, 64, L"PLAYLIST: %ls (%lld Tracks)", CurrentPlaylist->Name, CurrentPlaylist->SongsCount);
+    swprintf(Title, 64, L"PLAYLIST: %ls (%d Tracks)", CurrentPlaylist->Name, CurrentPlaylist->SongsCount);
 
     write_padded(r, 2, 1, Title, 64, UI_HEADER);
 
@@ -445,7 +445,7 @@ void draw_playlist(app* App) {
     console_draw_rectangle(&App->Renderer, rc);
 
     wchar_t TitleBuffer[64];
-    swprintf(TitleBuffer, 64, L"PLAYLIST %lld", App->AudioEngine.SongsCount);
+    swprintf(TitleBuffer, 64, L"PLAYLIST %d", App->AudioEngine.SongsCount);
     console_write_text(&App->Renderer, 2, BODY_TOP, TitleBuffer, wcslen(TitleBuffer));
 
     i32 y = BODY_TOP + 2;
@@ -552,26 +552,26 @@ void draw_original_layout(app* App) {
 /////////////////////////////////
 //  PLAYLIST
 /////////////////////////////////
-u8 playlist_init(playlist* Playlist, i64 Capacity, const wchar_t* Name) {
+u8 playlist_init(playlist* Playlist, u32 Capacity, const wchar_t* Name) {
     wcsncpy(Playlist->Name, Name, 32);
-    Playlist->SongIndexList = (i64*)malloc(sizeof(i64)*Capacity);
+    Playlist->SongIndexList = (u32*)malloc(sizeof(u32)*Capacity);
     Playlist->Capacity      = Capacity;
     Playlist->SongsCount    = 0;
 
     return 0;
 }
 
-u8 playlist_push(playlist* Playlist, i64 SongIndex) {
+u8 playlist_push(playlist* Playlist, u32 SongIndex) {
     // Allocate more
     if (Playlist->SongsCount >= Playlist->Capacity) { return 1; }
     Playlist->SongIndexList[Playlist->SongsCount++] = SongIndex;
     return 0;
 }
 
-u8 playlist_removeAt(playlist* Playlist, i64 Index) {
+u8 playlist_removeAt(playlist* Playlist, u32 Index) {
     if (Playlist->SongsCount == 0) { return 1; }
     Playlist->SongIndexList[Index] = -1;
-    for (i64 i = Index + 1; i < Playlist->SongsCount; ++i) {
+    for (u32 i = Index + 1; i < Playlist->SongsCount; ++i) {
         Playlist->SongIndexList[i-1] = Playlist->SongIndexList[i];
     }
     Playlist->SongsCount--;
@@ -602,12 +602,12 @@ u8 app_init(app* App) {
 
     playlist_init(&App->CurrentPlaylist, App->AudioEngine.SongsCount, L"TestPlaylist");
 
-    playlist_push(&App->CurrentPlaylist, 0);
-    playlist_push(&App->CurrentPlaylist, 5);
-    playlist_push(&App->CurrentPlaylist, 10);
-    playlist_push(&App->CurrentPlaylist, 3);
+    playlist_push(&App->CurrentPlaylist, 0u);
+    playlist_push(&App->CurrentPlaylist, 5u);
+    playlist_push(&App->CurrentPlaylist, 10u);
+    playlist_push(&App->CurrentPlaylist, 3u);
 
-    for (i64 i = 0; i < App->UIState.MetadataCount; ++i) {
+    for (u32 i = 0; i < App->UIState.MetadataCount; ++i) {
         memcpy(App->UIState.MetadataToRenderBuffer+i, &(App->AudioEngine.Songs+i)->SongMetadata, sizeof(song_metadata));
     }
 

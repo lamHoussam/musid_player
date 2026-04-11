@@ -217,7 +217,7 @@ u8 AudioEngineInit(audio_engine* AudioEngine) {
 
 // @NOTE: Maybe do it differently
 u8 _UnloadFirstLoadedSongThatIsNotPlaying(audio_engine* AudioEngine) {
-    for (u64 i = 0; i < AudioEngine->SongsCount; ++i) {
+    for (u32 i = 0; i < AudioEngine->SongsCount; ++i) {
         song_data* SongData = AudioEngine->Songs+i;
         if (AudioEngine->CurrentSongIndex != i && SongData->AudioBufferIsLoaded) {
             return AudioEngineUnloadSongAudioBuffer(AudioEngine, i);
@@ -302,7 +302,7 @@ u8 _AudioEnginePlaySong(audio_engine* AudioEngine) {
 
     _UnloadFirstLoadedSongThatIsNotPlaying(AudioEngine);
 
-    printf("Started playing %lld\n", AudioEngine->CurrentSongIndex);
+    printf("Started playing %d\n", AudioEngine->CurrentSongIndex);
     return 0;
 }
 
@@ -314,7 +314,7 @@ void AudioEngineUpdate(audio_engine* AudioEngine) {
         printf("I have awaited properly\n");
         if (AudioEngine->IsLooping) { _AudioEngineReplaySong(AudioEngine); } 
         else { AudioEnginePlayNext(AudioEngine); }
-        printf("Started playing %lld\n", AudioEngine->CurrentSongIndex);
+        printf("Started playing %d\n", AudioEngine->CurrentSongIndex);
         ResetEvent(AudioEngine->VoiceCallback->hBufferEndEvent);
     }
 }
@@ -338,14 +338,14 @@ u8 AudioEngineTogglePlayPause(audio_engine* AudioEngine) {
 
 
 
-u8 AudioEngineUnloadSongAudioBuffer(audio_engine* AudioEngine, u64 SongIndex) {
+u8 AudioEngineUnloadSongAudioBuffer(audio_engine* AudioEngine, u32 SongIndex) {
     song_data* SongData = AudioEngine->Songs+SongIndex;
     if (SongData->AudioBufferIsLoaded) {
         SongData->AudioBufferIsLoaded = false; 
         free(SongData->SongBufferData.Data);
         SongData->SongBufferData = {0};
         AudioEngine->LoadedSongsCount--;
-        printf("Unloaded song: %lld\n", SongIndex);
+        printf("Unloaded song: %d\n", SongIndex);
     }
 
     return 0;
@@ -430,7 +430,7 @@ u8 AudioEngineLoadSong(audio_engine* AudioEngine, const wchar_t* SongName) {
     return 0;
 }
 
-u8 AudioEnginePlaySongAtIndex(audio_engine* AudioEngine, u64 Index) {
+u8 AudioEnginePlaySongAtIndex(audio_engine* AudioEngine, u32 Index) {
     AudioEngine->CurrentSongIndex = Index;
     return _AudioEnginePlaySong(AudioEngine);
 }

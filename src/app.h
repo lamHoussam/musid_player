@@ -52,9 +52,9 @@ struct ui_state {
 
 struct playlist {
     wchar_t Name[32];
-    i64     SongsCount;
-    i64     Capacity;
-    i64*    SongIndexList;
+    u32     SongsCount;
+    u32     Capacity;
+    u32*    SongIndexList;
 };
 
 struct app
@@ -72,9 +72,9 @@ void    draw_now_playing(app* App);
 void    draw_progress(app* App);
 void    draw_footer(ConsoleRenderer* c);
 
-u8      playlist_init(playlist* Playlist, i64 Capacity, const wchar_t* Name);
-u8      playlist_push(playlist* Playlist, i64 SongIndex);
-u8      playlist_removeAt(playlist* Playlist, i64 Index);
+u8      playlist_init(playlist* Playlist, u32 Capacity, const wchar_t* Name);
+u8      playlist_push(playlist* Playlist, u32 SongIndex);
+u8      playlist_removeAt(playlist* Playlist, u32 Index);
 
 u8      app_init(app* App);
 void    app_run(app* App);

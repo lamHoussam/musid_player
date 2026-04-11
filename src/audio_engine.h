@@ -46,24 +46,26 @@ struct audio_engine {
     b8              IsPlaying;
     b8              IsLooping;
 
+
     XAUDIO2_BUFFER      AudioBuffer;
 
     IXAudio2*               xAudio2{};
     IXAudio2SourceVoice*    xAudio2SourceVoice{};
     IXAudio2MasteringVoice* xAudioMasteringVoice{};
 
+    platform_audio*         PlatformAudio;
     song_data*              Songs;
-    u64                     SongsCount;
-    u64                     SongsCapacity;
-    u64                     CurrentSongIndex;
-    u64                     LoadedSongsCount;
+    u32                     SongsCount;
+    u32                     SongsCapacity;
+    u32                     CurrentSongIndex;
+    u32                     LoadedSongsCount;
     i32                     CurrentVolume;
 };
 
 u8      AudioEngineInit(audio_engine* AudioEngine);
 void    AudioEngineUpdate(audio_engine* AudioEngine);
 u8      AudioEngineLoadSong(audio_engine* AudioEngine, const wchar_t* Song);
-u8      AudioEngineUnloadSongAudioBuffer(audio_engine* AudioEngine, u64 SongIndex);
+u8      AudioEngineUnloadSongAudioBuffer(audio_engine* AudioEngine, u32 SongIndex);
 u8      AudioEngineLoadSongsFromFolder(audio_engine* AudioEngine, const wchar_t* Folder);
 
 u8 AudioEnginePause(audio_engine* AudioEngine);
@@ -72,7 +74,7 @@ u8 AudioEngineTogglePlayPause(audio_engine* AudioEngine);
 
 u8 AudioEnginePlayNext(audio_engine* AudioEngine);
 u8 AudioEnginePlayPrev(audio_engine* AudioEngine);
-u8 AudioEnginePlaySongAtIndex(audio_engine* AudioEngine, u64 Index);
+u8 AudioEnginePlaySongAtIndex(audio_engine* AudioEngine, u32 Index);
 
 i32 GetSongBufferDurationInSec(const song_buffer* SongBuffer);
 
