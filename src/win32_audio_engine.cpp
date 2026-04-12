@@ -12,6 +12,38 @@
 #define fourccINAM 'MANI'
 #define fourccIPRD 'DRPI'
 
+struct voice_callback : public IXAudio2VoiceCallback {
+public: 
+    HANDLE hBufferEndEvent;
+    voice_callback(): hBufferEndEvent(CreateEvent(NULL, TRUE, FALSE, NULL)) {}
+    ~voice_callback() { CloseHandle(hBufferEndEvent); }
+
+    void OnStreamEnd() { 
+        printf("On Stream End\n");
+        SetEvent(hBufferEndEvent);
+    }
+
+    void OnVoiceProcessingPassEnd() { }
+    void OnVoiceProcessingPassStart(UINT32 SamplesRequired) {    }
+    void OnBufferEnd(void * pBufferContext) override { 
+        printf("On Buffer End\n");
+    }
+    void OnBufferStart(void * pBufferContext) {}
+    void OnLoopEnd(void * pBufferContext) {}
+    void OnVoiceError(void * pBufferContext, HRESULT Error) {
+        printf("Error on voice\n");
+    }
+};
+
+
+struct platform_audio_engine {
+    XAUDIO2_BUFFER          AudioBuffer;
+    voice_callback*         VoiceCallback;
+    IXAudio2*               xAudio2{};
+    IXAudio2SourceVoice*    xAudio2SourceVoice{};
+    IXAudio2MasteringVoice* xAudioMasteringVoice{};
+};
+
 static void CharStr2WCharStr(const char* Str, wchar_t* wStr, u32 Size) {
     mbstowcs(wStr, Str, Size);
 }
@@ -194,13 +226,15 @@ wchar_t* GetFileName(wchar_t* path) {
     return lastSeparator ? lastSeparator + 1 : path;
 }
 
-u8 AudioEngineInit(audio_engine* AudioEngine) {
+u8 AudioEngineInit(audio_engine_state* AudioEngine, platform_audio_engine** PlatformAudioEngine) {
+    *PlatformAudioEngine = new platform_audio_engine();
+
     ::CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-    ::XAudio2Create(&AudioEngine->xAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);
+    ::XAudio2Create(&(*PlatformAudioEngine)->xAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);
 
-    AudioEngine->VoiceCallback = new voice_callback();
+    (*PlatformAudioEngine)->VoiceCallback = new voice_callback();
 
-    AudioEngine->xAudio2->CreateMasteringVoice(&AudioEngine->xAudioMasteringVoice);
+    (*PlatformAudioEngine)->xAudio2->CreateMasteringVoice(&(*PlatformAudioEngine)->xAudioMasteringVoice);
 
     // @NOTE: Not true
     AudioEngine->IsPlaying = true;
@@ -216,7 +250,7 @@ u8 AudioEngineInit(audio_engine* AudioEngine) {
 }
 
 // @NOTE: Maybe do it differently
-u8 _UnloadFirstLoadedSongThatIsNotPlaying(audio_engine* AudioEngine) {
+u8 _UnloadFirstLoadedSongThatIsNotPlaying(audio_engine_state* AudioEngine) {
     for (u32 i = 0; i < AudioEngine->SongsCount; ++i) {
         song_data* SongData = AudioEngine->Songs+i;
         if (AudioEngine->CurrentSongIndex != i && SongData->AudioBufferIsLoaded) {
@@ -271,34 +305,35 @@ WAVEFORMATEX _GetWaveFormatEx(const song_buffer* SongBuffer) {
     return Wfx;
 }
 
-u8 _AudioEngineReplaySong(audio_engine* AudioEngine) {
+u8 _AudioEngineReplaySong(audio_engine_state* AudioEngine, platform_audio_engine* PlatformAudioEngine) {
     song_data* SongData = AudioEngine->Songs+AudioEngine->CurrentSongIndex;
 
-    AudioEngine->AudioBuffer = _GetXAudio2Buffer(&SongData->SongBufferData);
+    PlatformAudioEngine->AudioBuffer = _GetXAudio2Buffer(&SongData->SongBufferData);
 
-    AudioEngine->xAudio2SourceVoice->SubmitSourceBuffer(&AudioEngine->AudioBuffer);
-    AudioEngine->xAudio2SourceVoice->Start(0);
+    PlatformAudioEngine->xAudio2SourceVoice->SubmitSourceBuffer(&PlatformAudioEngine->AudioBuffer);
+    PlatformAudioEngine->xAudio2SourceVoice->Start(0);
+
     return 0;
 }
 
-u8 _AudioEnginePlaySong(audio_engine* AudioEngine) {
+u8 _AudioEnginePlaySong(audio_engine_state* AudioEngine, platform_audio_engine* PlatformAudioEngine) {
     song_data* SongData = AudioEngine->Songs+AudioEngine->CurrentSongIndex;
 
-    if (AudioEngine->xAudio2SourceVoice != nullptr) {
-        AudioEngine->xAudio2SourceVoice->DestroyVoice();
+    if (PlatformAudioEngine->xAudio2SourceVoice != nullptr) {
+        PlatformAudioEngine->xAudio2SourceVoice->DestroyVoice();
     }
 
     if (!SongData->AudioBufferIsLoaded) {
         _LoadSongAudioBufferFromFile(SongData->SongMetadata.FilePath, SongData);
     }
 
-    AudioEngine->AudioBuffer = _GetXAudio2Buffer(&SongData->SongBufferData);
+    PlatformAudioEngine->AudioBuffer = _GetXAudio2Buffer(&SongData->SongBufferData);
     WAVEFORMATEX Wfx = _GetWaveFormatEx(&SongData->SongBufferData);
 
-    AudioEngine->xAudio2->CreateSourceVoice(&AudioEngine->xAudio2SourceVoice, (WAVEFORMATEX*)&Wfx, 0, XAUDIO2_DEFAULT_FREQ_RATIO, AudioEngine->VoiceCallback, NULL, NULL);
+    PlatformAudioEngine->xAudio2->CreateSourceVoice(&PlatformAudioEngine->xAudio2SourceVoice, (WAVEFORMATEX*)&Wfx, 0, XAUDIO2_DEFAULT_FREQ_RATIO, PlatformAudioEngine->VoiceCallback, NULL, NULL);
 
-    AudioEngine->xAudio2SourceVoice->SubmitSourceBuffer(&AudioEngine->AudioBuffer);
-    AudioEngine->xAudio2SourceVoice->Start(0);
+    PlatformAudioEngine->xAudio2SourceVoice->SubmitSourceBuffer(&PlatformAudioEngine->AudioBuffer);
+    PlatformAudioEngine->xAudio2SourceVoice->Start(0);
 
     _UnloadFirstLoadedSongThatIsNotPlaying(AudioEngine);
 
@@ -306,39 +341,39 @@ u8 _AudioEnginePlaySong(audio_engine* AudioEngine) {
     return 0;
 }
 
-void AudioEngineUpdate(audio_engine* AudioEngine) {
+void AudioEngineUpdate(audio_engine_state* AudioEngine, platform_audio_engine* PlatformAudioEngine) {
     f32 FloatVolume = 1.0f * (AudioEngine->CurrentVolume - AUDIO_ENGINE_MIN_VOLUME) / (AUDIO_ENGINE_MAX_VOLUME - AUDIO_ENGINE_MIN_VOLUME);
 
-    AudioEngine->xAudioMasteringVoice->SetVolume(FloatVolume);
-    if (WaitForSingleObject(AudioEngine->VoiceCallback->hBufferEndEvent, 0) == WAIT_OBJECT_0) { 
+    PlatformAudioEngine->xAudioMasteringVoice->SetVolume(FloatVolume);
+    if (WaitForSingleObject(PlatformAudioEngine->VoiceCallback->hBufferEndEvent, 0) == WAIT_OBJECT_0) { 
         printf("I have awaited properly\n");
-        if (AudioEngine->IsLooping) { _AudioEngineReplaySong(AudioEngine); } 
-        else { AudioEnginePlayNext(AudioEngine); }
+        if (AudioEngine->IsLooping) { _AudioEngineReplaySong(AudioEngine, PlatformAudioEngine); } 
+        else { AudioEnginePlayNext(AudioEngine, PlatformAudioEngine); }
         printf("Started playing %d\n", AudioEngine->CurrentSongIndex);
-        ResetEvent(AudioEngine->VoiceCallback->hBufferEndEvent);
+        ResetEvent(PlatformAudioEngine->VoiceCallback->hBufferEndEvent);
     }
 }
 
-u8 AudioEnginePause(audio_engine* AudioEngine) {
-    AudioEngine->xAudio2->StopEngine();
+u8 AudioEnginePause(audio_engine_state* AudioEngine, platform_audio_engine* PlatformAudioEngine) {
+    PlatformAudioEngine->xAudio2->StopEngine();
     AudioEngine->IsPlaying = false;
     return 0;
 }
 
-u8 AudioEnginePlay(audio_engine* AudioEngine) {
-    AudioEngine->xAudio2->StartEngine();
+u8 AudioEnginePlay(audio_engine_state* AudioEngine, platform_audio_engine* PlatformAudioEngine) {
+    PlatformAudioEngine->xAudio2->StartEngine();
     AudioEngine->IsPlaying = true;
     return 0;
 }
 
-u8 AudioEngineTogglePlayPause(audio_engine* AudioEngine) {
-    if (AudioEngine->IsPlaying) { return AudioEnginePause(AudioEngine); }
-    else { return AudioEnginePlay(AudioEngine); }
+u8 AudioEngineTogglePlayPause(audio_engine_state* AudioEngine, platform_audio_engine* PlatformAudioEngine) {
+    if (AudioEngine->IsPlaying) { return AudioEnginePause(AudioEngine, PlatformAudioEngine); }
+    else { return AudioEnginePlay(AudioEngine, PlatformAudioEngine); }
 }
 
 
 
-u8 AudioEngineUnloadSongAudioBuffer(audio_engine* AudioEngine, u32 SongIndex) {
+u8 AudioEngineUnloadSongAudioBuffer(audio_engine_state* AudioEngine, u32 SongIndex) {
     song_data* SongData = AudioEngine->Songs+SongIndex;
     if (SongData->AudioBufferIsLoaded) {
         SongData->AudioBufferIsLoaded = false; 
@@ -351,7 +386,7 @@ u8 AudioEngineUnloadSongAudioBuffer(audio_engine* AudioEngine, u32 SongIndex) {
     return 0;
 }
 
-u8 AudioEngineLoadSongsFromFolder(audio_engine* AudioEngine, const wchar_t* Folder) {
+u8 AudioEngineLoadSongsFromFolder(audio_engine_state* AudioEngine, const wchar_t* Folder) {
     wchar_t searchPath[MAX_PATH];
     swprintf_s(searchPath, L"%s\\*.wav", Folder);
 
@@ -416,7 +451,7 @@ u8 LoadSongDataFromFile(const wchar_t* File, song_data* OutSongData, b32 LoadAud
     return 0;
 }
 
-u8 AudioEngineLoadSong(audio_engine* AudioEngine, const wchar_t* SongName) {
+u8 AudioEngineLoadSong(audio_engine_state* AudioEngine, const wchar_t* SongName) {
     if (AudioEngine->SongsCount < AudioEngine->SongsCapacity) {
         song_data* SongData = &AudioEngine->Songs[AudioEngine->SongsCount++];
         if (AudioEngine->LoadedSongsCount <= AUDIO_ENGINE_MAX_LOADED_SONGS) {
@@ -430,32 +465,44 @@ u8 AudioEngineLoadSong(audio_engine* AudioEngine, const wchar_t* SongName) {
     return 0;
 }
 
-u8 AudioEnginePlaySongAtIndex(audio_engine* AudioEngine, u32 Index) {
+u8 AudioEnginePlaySongAtIndex(audio_engine_state* AudioEngine, platform_audio_engine* PlatformAudioEngine, u32 Index) {
     AudioEngine->CurrentSongIndex = Index;
-    return _AudioEnginePlaySong(AudioEngine);
+    return _AudioEnginePlaySong(AudioEngine, PlatformAudioEngine);
 }
 
-u8 AudioEnginePlayNext(audio_engine* AudioEngine) {
+u8 AudioEnginePlayNext(audio_engine_state* AudioEngine, platform_audio_engine* PlatformAudioEngine) {
     if (AudioEngine->SongsCount == 0) { return 1; }
     // @NOTE: Check
     if (++AudioEngine->CurrentSongIndex >= AudioEngine->SongsCount) {
         AudioEngine->CurrentSongIndex = 0;
     }
 
-    return _AudioEnginePlaySong(AudioEngine);
+    return _AudioEnginePlaySong(AudioEngine, PlatformAudioEngine);
 }
 
-u8 AudioEnginePlayPrev(audio_engine* AudioEngine) {
+u8 AudioEnginePlayPrev(audio_engine_state* AudioEngine, platform_audio_engine* PlatformAudioEngine) {
     if (AudioEngine->SongsCount == 0) { return 1; }
     // @NOTE: Check
     if (AudioEngine->CurrentSongIndex == 0) {
         AudioEngine->CurrentSongIndex = AudioEngine->SongsCount - 1;
     } else { --AudioEngine->CurrentSongIndex; }
 
-    return _AudioEnginePlaySong(AudioEngine);
+    return _AudioEnginePlaySong(AudioEngine, PlatformAudioEngine);
 }
 
+
+u64 GetSamplesPlayed(platform_audio_engine* PlatformAudioEngine) {
+    u64 SamplesPlayed = 0;
+    if (PlatformAudioEngine->xAudio2SourceVoice != nullptr) {
+        XAUDIO2_VOICE_STATE State;
+        PlatformAudioEngine->xAudio2SourceVoice->GetState(&State);
+        SamplesPlayed = State.SamplesPlayed;
+    }
+
+    return SamplesPlayed;
+}
 
 i32 GetSongBufferDurationInSec(const song_buffer* SongBuffer) {
     return SongBuffer->BufferSize / SongBuffer->NumAvgBytesPerSec;
 }
+

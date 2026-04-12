@@ -59,11 +59,13 @@ struct playlist {
 
 struct app
 {
-    audio_engine    AudioEngine;
-    ConsoleRenderer Renderer;
-    ui_state        UIState;
-    b8              IsRunning;
-    playlist        CurrentPlaylist; // Should have multiple playlists later
+    audio_engine_state      AudioEngineState;
+    // @NOTE: I dont like this. Change later, maybe
+    platform_audio_engine*  PlatformAudioEngine;
+    ConsoleRenderer         Renderer;
+    ui_state                UIState;
+    b8                      IsRunning;
+    playlist                CurrentPlaylist; // @NOTE: Should have multiple playlists later
 };
 
 void    draw_header(ConsoleRenderer* c);

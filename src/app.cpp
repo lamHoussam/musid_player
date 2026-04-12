@@ -61,14 +61,8 @@ static void write_padded(ConsoleRenderer* r, i32 x, i32 y, const wchar_t* text, 
 void render_miniplayer(app* App, i32 BottomTop, i32 BottomBottom) {
     draw_box(&App->Renderer, 0, BottomTop, WIDTH - 1, BottomBottom, UI_ACCENT);
 
-    u64 SamplesPlayed = 0;
-    if (App->AudioEngine.xAudio2SourceVoice != nullptr) {
-        XAUDIO2_VOICE_STATE State;
-        App->AudioEngine.xAudio2SourceVoice->GetState(&State);
-        SamplesPlayed = State.SamplesPlayed;
-    }
-
-    song_data* CurrentSong  = App->AudioEngine.Songs+App->AudioEngine.CurrentSongIndex;
+    u64 SamplesPlayed = GetSamplesPlayed(App->PlatformAudioEngine);
+    song_data* CurrentSong  = App->AudioEngineState.Songs+App->AudioEngineState.CurrentSongIndex;
     i32 DurationInSec       = GetSongBufferDurationInSec(&CurrentSong->SongBufferData);
     u64 CurrentTimeInSec    = SamplesPlayed / CurrentSong->SongBufferData.SamplesPerSec;
     i32 CurrentFloorMinDuration = CurrentTimeInSec / 60;
@@ -110,7 +104,7 @@ void render_miniplayer(app* App, i32 BottomTop, i32 BottomBottom) {
 void RenderLayout_Library(app* App) {
 
     ConsoleRenderer* r = &App->Renderer;
-    audio_engine* AudioEngine = &App->AudioEngine;
+    audio_engine_state* AudioEngine = &App->AudioEngineState;
 
     console_clear(r, L' ', UI_BG);
 
@@ -351,7 +345,7 @@ void RenderLayout_Playlist(app* App) {
 
         wchar_t line[128];
 
-        song_metadata* SongMetadata = &(App->AudioEngine.Songs+CurrentPlaylist->SongIndexList[i])->SongMetadata;
+        song_metadata* SongMetadata = &(App->AudioEngineState.Songs+CurrentPlaylist->SongIndexList[i])->SongMetadata;
 
         if (i == playingIndex) {
             swprintf(line, 128, L"%lc %02d  %ls", UI_PLAY, i + 1, SongMetadata->SongName);
@@ -445,17 +439,17 @@ void draw_playlist(app* App) {
     console_draw_rectangle(&App->Renderer, rc);
 
     wchar_t TitleBuffer[64];
-    swprintf(TitleBuffer, 64, L"PLAYLIST %d", App->AudioEngine.SongsCount);
+    swprintf(TitleBuffer, 64, L"PLAYLIST %d", App->AudioEngineState.SongsCount);
     console_write_text(&App->Renderer, 2, BODY_TOP, TitleBuffer, wcslen(TitleBuffer));
 
     i32 y = BODY_TOP + 2;
 
     // @NOTE: Check
-    for (i32 i = 0; i < App->AudioEngine.SongsCount; i++) {
-        WORD attr = (i == App->AudioEngine.CurrentSongIndex) ? COLOR_SELECTED : COLOR_DEFAULT;
+    for (i32 i = 0; i < App->AudioEngineState.SongsCount; i++) {
+        WORD attr = (i == App->AudioEngineState.CurrentSongIndex) ? COLOR_SELECTED : COLOR_DEFAULT;
 
         wchar_t buffer[64];
-        swprintf(buffer, 64, L"%02d. %s", i+1, App->AudioEngine.Songs[i].SongMetadata.SongName);
+        swprintf(buffer, 64, L"%02d. %s", i+1, App->AudioEngineState.Songs[i].SongMetadata.SongName);
 
         console_write_text(&App->Renderer, 2, y++, buffer, wcslen(buffer));
     }
@@ -470,8 +464,8 @@ void draw_now_playing(app* App) {
     i32 x = INFO_LEFT + 4;
     i32 y = BODY_TOP + 3;
 
-    if (App->AudioEngine.SongsCount > 0) {
-        song_data SongData = App->AudioEngine.Songs[App->AudioEngine.CurrentSongIndex];
+    if (App->AudioEngineState.SongsCount > 0) {
+        song_data SongData = App->AudioEngineState.Songs[App->AudioEngineState.CurrentSongIndex];
 
         console_write_text(&App->Renderer, x, y, SongData.SongMetadata.SongName, wcslen(SongData.SongMetadata.SongName));
         console_write_text(&App->Renderer, x, y + 2, SongData.SongMetadata.Artist, wcslen(SongData.SongMetadata.Artist));
@@ -483,16 +477,10 @@ void draw_progress(app* App) {
     ConsoleRect rc = {PROGRESS_TOP, PROGRESS_BOTTOM, 0, WIDTH - 1};
     console_draw_rectangle(&App->Renderer, rc);
 
-    u64 SamplesPlayed = 0;
-    if (App->AudioEngine.xAudio2SourceVoice != nullptr) {
-        XAUDIO2_VOICE_STATE State;
-        App->AudioEngine.xAudio2SourceVoice->GetState(&State);
-        SamplesPlayed = State.SamplesPlayed;
-    }
-
     i32 barWidth = WIDTH - 40;
-    song_data* CurrentSong = App->AudioEngine.Songs+App->AudioEngine.CurrentSongIndex;
-    
+    song_data* CurrentSong = App->AudioEngineState.Songs+App->AudioEngineState.CurrentSongIndex;
+
+    u64 SamplesPlayed = GetSamplesPlayed(App->PlatformAudioEngine);
     u64 CurrentTimeInSec = SamplesPlayed / CurrentSong->SongBufferData.SamplesPerSec;
 
     i32 y = PROGRESS_TOP + 2;
@@ -531,7 +519,7 @@ void draw_volume(app* App) {
 
     swprintf(VolumeText, 32, L"%02d / %02d / %02d", 
         AUDIO_ENGINE_MIN_VOLUME, 
-        App->AudioEngine.CurrentVolume, 
+        App->AudioEngineState.CurrentVolume, 
         AUDIO_ENGINE_MAX_VOLUME);
 
     i32 y = PROGRESS_TOP + 8;
@@ -586,21 +574,22 @@ u8 playlist_removeAt(playlist* Playlist, u32 Index) {
 u8 app_init(app* App) {
     console_init(&App->Renderer);
 
-    AudioEngineInit(&App->AudioEngine);
-    AudioEngineLoadSongsFromFolder(&App->AudioEngine, SONGS_FOLDER);
-    if (App->AudioEngine.SongsCount != 0) { AudioEnginePlaySongAtIndex(&App->AudioEngine, 0); }
+    AudioEngineInit(&App->AudioEngineState, &App->PlatformAudioEngine);
+    AudioEngineLoadSongsFromFolder(&App->AudioEngineState, SONGS_FOLDER);
+
+    if (App->AudioEngineState.SongsCount != 0) { AudioEnginePlaySongAtIndex(&App->AudioEngineState, App->PlatformAudioEngine, 0); }
 
     App->UIState.UIVisualStartIndex = 0;
     App->UIState.UICurrentSelectedSongIndex = 0;
 
-    App->UIState.MetadataToRenderBuffer = (song_metadata*)malloc(sizeof(song_metadata)*App->AudioEngine.SongsCount);
-    App->UIState.MetadataCount          = App->AudioEngine.SongsCount;
+    App->UIState.MetadataToRenderBuffer = (song_metadata*)malloc(sizeof(song_metadata)*App->AudioEngineState.SongsCount);
+    App->UIState.MetadataCount          = App->AudioEngineState.SongsCount;
     App->UIState.CurrentMode            = UI_MODE_NORMAL;
     App->UIState.CurrentLayout          = UI_LAYOUT_LIBRARY;
     wcsncpy(App->UIState.SearchString, L"                ", 16);
     App->UIState.SearchStringCurrentIndex = 0;
 
-    playlist_init(&App->CurrentPlaylist, App->AudioEngine.SongsCount, L"TestPlaylist");
+    playlist_init(&App->CurrentPlaylist, App->AudioEngineState.SongsCount, L"TestPlaylist");
 
     playlist_push(&App->CurrentPlaylist, 0u);
     playlist_push(&App->CurrentPlaylist, 5u);
@@ -608,7 +597,7 @@ u8 app_init(app* App) {
     playlist_push(&App->CurrentPlaylist, 3u);
 
     for (u32 i = 0; i < App->UIState.MetadataCount; ++i) {
-        memcpy(App->UIState.MetadataToRenderBuffer+i, &(App->AudioEngine.Songs+i)->SongMetadata, sizeof(song_metadata));
+        memcpy(App->UIState.MetadataToRenderBuffer+i, &(App->AudioEngineState.Songs+i)->SongMetadata, sizeof(song_metadata));
     }
 
     return 0;
@@ -641,32 +630,32 @@ void app_update(app* App) {
     {
     case UI_MODE_NORMAL: {
 
-        if (App->Renderer.input.keys[L'n']) { AudioEnginePlayNext(&App->AudioEngine); }
-        if (App->Renderer.input.keys[L'p']) { AudioEnginePlayPrev(&App->AudioEngine); }
-        if (App->Renderer.input.keys[L' ']) { AudioEngineTogglePlayPause(&App->AudioEngine); }
+        if (App->Renderer.input.keys[L'n']) { AudioEnginePlayNext(&App->AudioEngineState, App->PlatformAudioEngine); }
+        if (App->Renderer.input.keys[L'p']) { AudioEnginePlayPrev(&App->AudioEngineState, App->PlatformAudioEngine); }
+        if (App->Renderer.input.keys[L' ']) { AudioEngineTogglePlayPause(&App->AudioEngineState, App->PlatformAudioEngine); }
         if (App->Renderer.input.keys[L'q']) { App->IsRunning = false; }
         if (App->Renderer.input.keys[L's']) {
             App->UIState.CurrentLayout = (ui_layout)((App->UIState.CurrentLayout+1)%2);
         }
-        if (App->Renderer.input.keys[L'u']) { App->AudioEngine.CurrentVolume++; }
-        if (App->Renderer.input.keys[L'd']) { App->AudioEngine.CurrentVolume--; }
-        if (App->Renderer.input.keys[L'l']) { App->AudioEngine.IsLooping = !App->AudioEngine.IsLooping; }
+        if (App->Renderer.input.keys[L'u']) { App->AudioEngineState.CurrentVolume++; }
+        if (App->Renderer.input.keys[L'd']) { App->AudioEngineState.CurrentVolume--; }
+        if (App->Renderer.input.keys[L'l']) { App->AudioEngineState.IsLooping = !App->AudioEngineState.IsLooping; }
         if (App->Renderer.input.keys[L'a']) { 
             playlist_push(&App->CurrentPlaylist, App->UIState.UICurrentSelectedSongIndex);
         }
 
         if (App->Renderer.input.keys[L'j']) { 
             App->UIState.UICurrentSelectedSongIndex += 1; 
-            App->UIState.UICurrentSelectedSongIndex %= App->AudioEngine.SongsCount;
+            App->UIState.UICurrentSelectedSongIndex %= App->AudioEngineState.SongsCount;
             App->Renderer.input.keys[L'j'] = false;
         }
         if (App->Renderer.input.keys[L'k']) { 
             App->UIState.UICurrentSelectedSongIndex -= 1; 
-            App->UIState.UICurrentSelectedSongIndex %= App->AudioEngine.SongsCount;
+            App->UIState.UICurrentSelectedSongIndex %= App->AudioEngineState.SongsCount;
             App->Renderer.input.keys[L'k'] = false;
         }
         if (App->Renderer.input.keys[VK_RETURN]) {
-            AudioEnginePlaySongAtIndex(&App->AudioEngine, App->UIState.UICurrentSelectedSongIndex);
+            AudioEnginePlaySongAtIndex(&App->AudioEngineState, App->PlatformAudioEngine, App->UIState.UICurrentSelectedSongIndex);
             App->Renderer.input.keys[VK_RETURN] = false;
         }
 
@@ -699,7 +688,7 @@ void app_update(app* App) {
     case UI_LAYOUT_PLAYLIST: { RenderLayout_Playlist(App); } break;
     }
 
-    AudioEngineUpdate(&App->AudioEngine);
+    AudioEngineUpdate(&App->AudioEngineState, App->PlatformAudioEngine);
     console_render(&App->Renderer);
 }
 

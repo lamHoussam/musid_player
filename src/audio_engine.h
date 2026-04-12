@@ -40,64 +40,33 @@ struct song_data {
     b8              AudioBufferIsLoaded;
 };
 
-struct platform_audio;
-struct audio_engine {
-    voice_callback* VoiceCallback;
-    b8              IsPlaying;
-    b8              IsLooping;
-
-
-    XAUDIO2_BUFFER      AudioBuffer;
-
-    IXAudio2*               xAudio2{};
-    IXAudio2SourceVoice*    xAudio2SourceVoice{};
-    IXAudio2MasteringVoice* xAudioMasteringVoice{};
-
-    platform_audio*         PlatformAudio;
-    song_data*              Songs;
-    u32                     SongsCount;
-    u32                     SongsCapacity;
-    u32                     CurrentSongIndex;
-    u32                     LoadedSongsCount;
-    i32                     CurrentVolume;
+struct platform_audio_engine;
+struct audio_engine_state {
+    song_data*  Songs;
+    u32         SongsCount;
+    u32         SongsCapacity;
+    u32         CurrentSongIndex;
+    u32         LoadedSongsCount;
+    i32         CurrentVolume;
+    b8          IsPlaying;
+    b8          IsLooping;
 };
 
-u8      AudioEngineInit(audio_engine* AudioEngine);
-void    AudioEngineUpdate(audio_engine* AudioEngine);
-u8      AudioEngineLoadSong(audio_engine* AudioEngine, const wchar_t* Song);
-u8      AudioEngineUnloadSongAudioBuffer(audio_engine* AudioEngine, u32 SongIndex);
-u8      AudioEngineLoadSongsFromFolder(audio_engine* AudioEngine, const wchar_t* Folder);
+u8      AudioEngineInit(audio_engine_state* AudioEngine, platform_audio_engine** PlatformAudioEngine);
+void    AudioEngineUpdate(audio_engine_state* AudioEngine, platform_audio_engine* PlatformAudioEngine);
+u8      AudioEngineLoadSong(audio_engine_state* AudioEngine, const wchar_t* Song);
+u8      AudioEngineUnloadSongAudioBuffer(audio_engine_state* AudioEngine, u32 SongIndex);
+u8      AudioEngineLoadSongsFromFolder(audio_engine_state* AudioEngine, const wchar_t* Folder);
 
-u8 AudioEnginePause(audio_engine* AudioEngine);
-u8 AudioEnginePlay(audio_engine* AudioEngine);
-u8 AudioEngineTogglePlayPause(audio_engine* AudioEngine);
+u8 AudioEnginePause(audio_engine_state* AudioEngine, platform_audio_engine* PlatformAudioEngine);
+u8 AudioEnginePlay(audio_engine_state* AudioEngine, platform_audio_engine* PlatformAudioEngine);
+u8 AudioEngineTogglePlayPause(audio_engine_state* AudioEngine, platform_audio_engine* PlatformAudioEngine);
 
-u8 AudioEnginePlayNext(audio_engine* AudioEngine);
-u8 AudioEnginePlayPrev(audio_engine* AudioEngine);
-u8 AudioEnginePlaySongAtIndex(audio_engine* AudioEngine, u32 Index);
+u8 AudioEnginePlayNext(audio_engine_state* AudioEngine, platform_audio_engine* PlatformAudioEngine);
+u8 AudioEnginePlayPrev(audio_engine_state* AudioEngine, platform_audio_engine* PlatformAudioEngine);
+u8 AudioEnginePlaySongAtIndex(audio_engine_state* AudioEngine, platform_audio_engine* PlatformAudioEngine, u32 Index);
+// @NOTE: Uninit platform audio engine
+
+u64 GetSamplesPlayed(platform_audio_engine* PlatformAudioEngine);
 
 i32 GetSongBufferDurationInSec(const song_buffer* SongBuffer);
-
-struct voice_callback : public IXAudio2VoiceCallback {
-public: 
-    HANDLE hBufferEndEvent;
-    voice_callback(): hBufferEndEvent(CreateEvent(NULL, TRUE, FALSE, NULL)) {}
-    ~voice_callback() { CloseHandle(hBufferEndEvent); }
-
-    void OnStreamEnd() { 
-        printf("On Stream End\n");
-        SetEvent(hBufferEndEvent);
-    }
-
-    void OnVoiceProcessingPassEnd() { }
-    void OnVoiceProcessingPassStart(UINT32 SamplesRequired) {    }
-    void OnBufferEnd(void * pBufferContext) override { 
-        printf("On Buffer End\n");
-    }
-    void OnBufferStart(void * pBufferContext) {}
-    void OnLoopEnd(void * pBufferContext) {}
-    void OnVoiceError(void * pBufferContext, HRESULT Error) {
-        printf("Error on voice\n");
-    }
-};
-
