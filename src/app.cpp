@@ -655,9 +655,9 @@ void app_update(app* App) {
             App->UIState.UICurrentSelectedSongIndex %= App->AudioEngineState.SongsCount;
             input_invalidate_key(input, L'k');
         }
-        if (input_get_key(input, VK_RETURN)) {
+        if (input_get_key(input, L'\r')) {
             AudioEnginePlaySongAtIndex(&App->AudioEngineState, App->PlatformAudioEngine, App->UIState.UICurrentSelectedSongIndex);
-            input_invalidate_key(input, VK_RETURN);
+            input_invalidate_key(input, L'\r');
         }
 
     } break;

@@ -88,11 +88,10 @@
   #define FOREGROUND_INTENSITY 0x0008 // text color is intensified.
   #define BACKGROUND_BLUE      0x0010 // background color contains blue.
   #define VK_BACK           0x08
-  #define VK_TAB            0x09
-  #define isalpha(x) (((x) <= 'Z' && (x) >= 'A') || ((x) <= 'z' && (x) >= 'a'))
   #define VK_ESCAPE         0x1B
-  #define VK_RETURN         0x0D
 #endif
+
+#define isalpha(x) (((x) <= 'Z' && (x) >= 'A') || ((x) <= 'z' && (x) >= 'a'))
 
 #ifndef max
 #define max(a,b)            (((a) > (b)) ? (a) : (b))
