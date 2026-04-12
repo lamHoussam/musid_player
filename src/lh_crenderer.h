@@ -1,8 +1,9 @@
 #ifndef LH_CONSOLE_RENDERER
 #define LH_CONSOLE_RENDERER
 
-#include <windows.h>
 #include <stdio.h>
+
+#include "types.h"
 
 #define HEIGHT  50
 #define WIDTH   200
@@ -77,6 +78,32 @@
 #define UI_REPEAT_CCW   L'\u21BA' // ↺
 
 
+// =============================
+// Colors
+// =============================
+#ifndef FOREGROUND_BLUE
+  #define FOREGROUND_BLUE      0x0001 // text color contains blue.
+  #define FOREGROUND_GREEN     0x0002 // text color contains green.
+  #define FOREGROUND_RED       0x0004 // text color contains red.
+  #define FOREGROUND_INTENSITY 0x0008 // text color is intensified.
+  #define BACKGROUND_BLUE      0x0010 // background color contains blue.
+  #define VK_BACK           0x08
+  #define VK_TAB            0x09
+  #define isalpha(x) (((x) <= 'Z' && (x) >= 'A') || ((x) <= 'z' && (x) >= 'a'))
+  #define VK_ESCAPE         0x1B
+  #define VK_RETURN         0x0D
+#endif
+
+#ifndef max
+#define max(a,b)            (((a) > (b)) ? (a) : (b))
+#endif
+
+#ifndef min
+#define min(a,b)            (((a) < (b)) ? (a) : (b))
+#endif
+
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -87,41 +114,39 @@ extern "C" {
 #define MYLIB_API __declspec(dllimport)
 #endif
 
-struct Cell {
-    wchar_t ch;
-    WORD attr;
-};
-
 struct ConsoleRect {
-    int top;
-    int bottom;
-    int left;
-    int right;
+    i32 top;
+    i32 bottom;
+    i32 left;
+    i32 right;
 };
 
 struct InputState {
-    int         keys[LH_KEYS_COUNT];
-    int         mouseX, mouseY;
-    int         mouseDX, mouseDY;
+    i32         keys[LH_KEYS_COUNT];
+    i32         mouseX, mouseY;
+    i32         mouseDX, mouseDY;
 };
 
-struct ConsoleRenderer {
-    Cell        backBuffer[HEIGHT*WIDTH];
-    CHAR_INFO   winBuffer[HEIGHT*WIDTH];
-    InputState  input;
-    HANDLE      hBuffer;
-    HANDLE      hInput;
-};
+struct ConsoleRenderer;
 
-MYLIB_API bool console_init(ConsoleRenderer* r);
-MYLIB_API void console_clear(ConsoleRenderer* console, wchar_t ch, WORD attr);
-MYLIB_API void console_put(ConsoleRenderer* console, int x, int y, wchar_t ch, WORD attr);
+MYLIB_API bool console_init(ConsoleRenderer** r);
+MYLIB_API void console_clear(ConsoleRenderer* console, wchar_t ch, u16 attr);
+MYLIB_API void console_put(ConsoleRenderer* console, i32 x, i32 y, wchar_t ch, u16 attr);
 MYLIB_API void render_bounds(ConsoleRenderer* console);
 MYLIB_API void console_render(ConsoleRenderer* console);
 
 MYLIB_API void console_draw_rectangle(ConsoleRenderer* console, const ConsoleRect rc);
-MYLIB_API void console_write_text(ConsoleRenderer* console, int x, int y, const wchar_t* ch, int size);
+MYLIB_API void console_write_text(ConsoleRenderer* console, i32 x, i32 y, const wchar_t* ch, i32 size);
 MYLIB_API void console_process_input(ConsoleRenderer* console);
+
+MYLIB_API InputState* console_get_input_state(ConsoleRenderer* console);
+
+MYLIB_API b8    input_get_key(const InputState* renderer, const i32 key);
+// @NOTE: Bad
+MYLIB_API void  input_invalidate_key(InputState* renderer, const i32 key);
+
+
+
 
 #ifdef __cplusplus
 }

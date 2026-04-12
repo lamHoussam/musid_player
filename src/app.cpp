@@ -27,17 +27,17 @@
 
 // ------------------------------------------------------------
 
-static void draw_hline(ConsoleRenderer* r, i32 y, i32 x0, i32 x1, WORD attr)
+static void draw_hline(ConsoleRenderer* r, i32 y, i32 x0, i32 x1, u16 attr)
 {
     for (i32 x = x0; x <= x1; ++x) { console_put(r, x, y, UI_HLINE, attr); }
 }
 
-static void draw_vline(ConsoleRenderer* r, i32 x, i32 y0, i32 y1, WORD attr)
+static void draw_vline(ConsoleRenderer* r, i32 x, i32 y0, i32 y1, u16 attr)
 {
     for (i32 y = y0; y <= y1; ++y) { console_put(r, x, y, UI_VLINE, attr); }
 }
 
-static void draw_box(ConsoleRenderer* r, i32 left, i32 top, i32 right, i32 bottom, WORD attr) {
+static void draw_box(ConsoleRenderer* r, i32 left, i32 top, i32 right, i32 bottom, u16 attr) {
     console_put(r, left,  top,    UI_CORNER_TL, attr);
     console_put(r, right, top,    UI_CORNER_TR, attr);
     console_put(r, left,  bottom, UI_CORNER_BL, attr);
@@ -49,7 +49,7 @@ static void draw_box(ConsoleRenderer* r, i32 left, i32 top, i32 right, i32 botto
     draw_vline(r, right,  top + 1,  bottom - 1, attr);
 }
 
-static void write_padded(ConsoleRenderer* r, i32 x, i32 y, const wchar_t* text, i32 width, WORD attr) {
+static void write_padded(ConsoleRenderer* r, i32 x, i32 y, const wchar_t* text, i32 width, u16 attr) {
     i32 len = (int)wcslen(text);
     i32 copy = len > width ? width : len;
 
@@ -59,7 +59,7 @@ static void write_padded(ConsoleRenderer* r, i32 x, i32 y, const wchar_t* text, 
 
 
 void render_miniplayer(app* App, i32 BottomTop, i32 BottomBottom) {
-    draw_box(&App->Renderer, 0, BottomTop, WIDTH - 1, BottomBottom, UI_ACCENT);
+    draw_box(App->Renderer, 0, BottomTop, WIDTH - 1, BottomBottom, UI_ACCENT);
 
     u64 SamplesPlayed = GetSamplesPlayed(App->PlatformAudioEngine);
     song_data* CurrentSong  = App->AudioEngineState.Songs+App->AudioEngineState.CurrentSongIndex;
@@ -73,7 +73,7 @@ void render_miniplayer(app* App, i32 BottomTop, i32 BottomBottom) {
     wchar_t TimeText[32];
     swprintf(TimeText, 32, L"%02d:%02d", CurrentFloorMinDuration, CurrentRemainingSecs);
 
-    write_padded(&App->Renderer, 2, BottomTop + 1,
+    write_padded(App->Renderer, 2, BottomTop + 1,
         TimeText,
         6,
         UI_TEXT);
@@ -85,11 +85,11 @@ void render_miniplayer(app* App, i32 BottomTop, i32 BottomBottom) {
     i32 filled = (i32)((f32)barWidth * (1.0f*CurrentTimeInSec/DurationInSec));
     for (i32 i = 0; i < barWidth; ++i) {
         wchar_t ch = (i < filled) ? UI_BLOCK_FULL : UI_BLOCK_LIGHT;
-        console_put(&App->Renderer, barStart + i, BottomTop + 1, ch, UI_ACCENT);
+        console_put(App->Renderer, barStart + i, BottomTop + 1, ch, UI_ACCENT);
     }
 
     swprintf(TimeText, 32, L"%02d:%02d", FloorMinDuration, RemainingSecs);
-    write_padded(&App->Renderer, barStart + barWidth + 2, BottomTop + 1,
+    write_padded(App->Renderer, barStart + barWidth + 2, BottomTop + 1,
         TimeText,
         6,
         UI_TEXT);
@@ -103,7 +103,7 @@ void render_miniplayer(app* App, i32 BottomTop, i32 BottomBottom) {
 // ------------------------------------------------------------
 void RenderLayout_Library(app* App) {
 
-    ConsoleRenderer* r = &App->Renderer;
+    ConsoleRenderer* r = App->Renderer;
     audio_engine_state* AudioEngine = &App->AudioEngineState;
 
     console_clear(r, L' ', UI_BG);
@@ -173,7 +173,7 @@ void RenderLayout_Library(app* App) {
 
         i32 SongIndex = App->UIState.UIVisualStartIndex+i;
 
-        WORD attr = UI_TEXT;
+        u16 attr = UI_TEXT;
 
         b32 isPlaying = (SongIndex == AudioEngine->CurrentSongIndex);
         b32 isSelected = (SongIndex == App->UIState.UICurrentSelectedSongIndex);
@@ -278,7 +278,7 @@ void RenderLayout_Library(app* App) {
 // ------------------------------------------------------------
 
 void RenderLayout_Playlist(app* App) {
-    ConsoleRenderer* r = &App->Renderer;
+    ConsoleRenderer* r = App->Renderer;
     playlist* CurrentPlaylist = &App->CurrentPlaylist;
 
     console_clear(r, L' ', UI_BG);
@@ -338,7 +338,7 @@ void RenderLayout_Playlist(app* App) {
     {
         int y = listTop + 2 + i;
 
-        WORD attr = UI_TEXT;
+        u16 attr = UI_TEXT;
 
         if (i == playingIndex) { attr = UI_PLAYING; }
         if (i == selectedIndex) { attr = UI_SELECTED; }
@@ -436,30 +436,30 @@ void draw_header(ConsoleRenderer* c) {
 
 void draw_playlist(app* App) {
     ConsoleRect rc = {BODY_TOP, BODY_BOTTOM, PLAYLIST_LEFT, PLAYLIST_RIGHT};
-    console_draw_rectangle(&App->Renderer, rc);
+    console_draw_rectangle(App->Renderer, rc);
 
     wchar_t TitleBuffer[64];
     swprintf(TitleBuffer, 64, L"PLAYLIST %d", App->AudioEngineState.SongsCount);
-    console_write_text(&App->Renderer, 2, BODY_TOP, TitleBuffer, wcslen(TitleBuffer));
+    console_write_text(App->Renderer, 2, BODY_TOP, TitleBuffer, wcslen(TitleBuffer));
 
     i32 y = BODY_TOP + 2;
 
     // @NOTE: Check
     for (i32 i = 0; i < App->AudioEngineState.SongsCount; i++) {
-        WORD attr = (i == App->AudioEngineState.CurrentSongIndex) ? COLOR_SELECTED : COLOR_DEFAULT;
+        u16 attr = (i == App->AudioEngineState.CurrentSongIndex) ? COLOR_SELECTED : COLOR_DEFAULT;
 
         wchar_t buffer[64];
         swprintf(buffer, 64, L"%02d. %s", i+1, App->AudioEngineState.Songs[i].SongMetadata.SongName);
 
-        console_write_text(&App->Renderer, 2, y++, buffer, wcslen(buffer));
+        console_write_text(App->Renderer, 2, y++, buffer, wcslen(buffer));
     }
 }
 
 void draw_now_playing(app* App) {
     ConsoleRect rc = {BODY_TOP, BODY_BOTTOM, INFO_LEFT, INFO_RIGHT};
-    console_draw_rectangle(&App->Renderer, rc);
+    console_draw_rectangle(App->Renderer, rc);
 
-    console_write_text(&App->Renderer, INFO_LEFT + 2, BODY_TOP, L" NOW PLAYING ", 12);
+    console_write_text(App->Renderer, INFO_LEFT + 2, BODY_TOP, L" NOW PLAYING ", 12);
 
     i32 x = INFO_LEFT + 4;
     i32 y = BODY_TOP + 3;
@@ -467,15 +467,15 @@ void draw_now_playing(app* App) {
     if (App->AudioEngineState.SongsCount > 0) {
         song_data SongData = App->AudioEngineState.Songs[App->AudioEngineState.CurrentSongIndex];
 
-        console_write_text(&App->Renderer, x, y, SongData.SongMetadata.SongName, wcslen(SongData.SongMetadata.SongName));
-        console_write_text(&App->Renderer, x, y + 2, SongData.SongMetadata.Artist, wcslen(SongData.SongMetadata.Artist));
-        console_write_text(&App->Renderer, x, y + 4, SongData.SongMetadata.Album, wcslen(SongData.SongMetadata.Album));
+        console_write_text(App->Renderer, x, y, SongData.SongMetadata.SongName, wcslen(SongData.SongMetadata.SongName));
+        console_write_text(App->Renderer, x, y + 2, SongData.SongMetadata.Artist, wcslen(SongData.SongMetadata.Artist));
+        console_write_text(App->Renderer, x, y + 4, SongData.SongMetadata.Album, wcslen(SongData.SongMetadata.Album));
     }
 }
 
 void draw_progress(app* App) {
     ConsoleRect rc = {PROGRESS_TOP, PROGRESS_BOTTOM, 0, WIDTH - 1};
-    console_draw_rectangle(&App->Renderer, rc);
+    console_draw_rectangle(App->Renderer, rc);
 
     i32 barWidth = WIDTH - 40;
     song_data* CurrentSong = App->AudioEngineState.Songs+App->AudioEngineState.CurrentSongIndex;
@@ -496,13 +496,13 @@ void draw_progress(app* App) {
 
     for (i32 i = 0; i < barWidth; i++) {
         wchar_t ch = (i < filled) ? L'x' : L' ';
-        console_put(&App->Renderer, x + i, y, ch, COLOR_ACCENT);
+        console_put(App->Renderer, x + i, y, ch, COLOR_ACCENT);
     }
 
     wchar_t timeText[32];
     swprintf(timeText, 32, L"%02d:%02d / %02d:%02d", CurrentFloorMinDuration, CurrentRemainingSecs, FloorMinDuration, RemainingSecs);
 
-    console_write_text(&App->Renderer, WIDTH - 20, y, timeText, wcslen(timeText));
+    console_write_text(App->Renderer, WIDTH - 20, y, timeText, wcslen(timeText));
 }
 
 void draw_footer(ConsoleRenderer* c) {
@@ -524,15 +524,15 @@ void draw_volume(app* App) {
 
     i32 y = PROGRESS_TOP + 8;
 
-    console_write_text(&App->Renderer, WIDTH - 20, y, VolumeText, wcslen(VolumeText));
+    console_write_text(App->Renderer, WIDTH - 20, y, VolumeText, wcslen(VolumeText));
 }
 
 void draw_original_layout(app* App) {
-    draw_header(&App->Renderer);
+    draw_header(App->Renderer);
     draw_playlist(App);
     draw_now_playing(App);
     draw_progress(App);
-    draw_footer(&App->Renderer);
+    draw_footer(App->Renderer);
     draw_volume(App);
 
 }
@@ -611,71 +611,72 @@ void app_run(app* App) {
 }
 
 void app_update(app* App) {
-    ConsoleRenderer* console = &App->Renderer;
+    ConsoleRenderer* console = App->Renderer;
+    InputState* input        = console_get_input_state(console);
 
-    console_clear(&App->Renderer, L' ', COLOR_DEFAULT);
-    console_process_input(&App->Renderer);
+    console_clear(App->Renderer, L' ', COLOR_DEFAULT);
+    console_process_input(App->Renderer);
 
-    if (App->Renderer.input.keys[VK_ESCAPE]) {
+    if (input_get_key(input, VK_ESCAPE)) {
         App->UIState.CurrentMode = UI_MODE_NORMAL;
-        App->Renderer.input.keys[VK_ESCAPE] = false;
+        input_invalidate_key(input, VK_ESCAPE);
     }
 
-    if (App->Renderer.input.keys[L'/']) {
+    if (input_get_key(input, L'/')) {
         App->UIState.CurrentMode = UI_MODE_SEARCH;
-        App->Renderer.input.keys[L'/'] = false;
+        input_invalidate_key(input, L'/');
     }
 
     switch (App->UIState.CurrentMode)
     {
     case UI_MODE_NORMAL: {
 
-        if (App->Renderer.input.keys[L'n']) { AudioEnginePlayNext(&App->AudioEngineState, App->PlatformAudioEngine); }
-        if (App->Renderer.input.keys[L'p']) { AudioEnginePlayPrev(&App->AudioEngineState, App->PlatformAudioEngine); }
-        if (App->Renderer.input.keys[L' ']) { AudioEngineTogglePlayPause(&App->AudioEngineState, App->PlatformAudioEngine); }
-        if (App->Renderer.input.keys[L'q']) { App->IsRunning = false; }
-        if (App->Renderer.input.keys[L's']) {
+        if (input_get_key(input, L'n')) { AudioEnginePlayNext(&App->AudioEngineState, App->PlatformAudioEngine); }
+        if (input_get_key(input, L'p')) { AudioEnginePlayPrev(&App->AudioEngineState, App->PlatformAudioEngine); }
+        if (input_get_key(input, L' ')) { AudioEngineTogglePlayPause(&App->AudioEngineState, App->PlatformAudioEngine); }
+        if (input_get_key(input, L'q')) { App->IsRunning = false; }
+        if (input_get_key(input, L's')) {
             App->UIState.CurrentLayout = (ui_layout)((App->UIState.CurrentLayout+1)%2);
         }
-        if (App->Renderer.input.keys[L'u']) { App->AudioEngineState.CurrentVolume++; }
-        if (App->Renderer.input.keys[L'd']) { App->AudioEngineState.CurrentVolume--; }
-        if (App->Renderer.input.keys[L'l']) { App->AudioEngineState.IsLooping = !App->AudioEngineState.IsLooping; }
-        if (App->Renderer.input.keys[L'a']) { 
+        if (input_get_key(input, L'u')) { App->AudioEngineState.CurrentVolume++; }
+        if (input_get_key(input, L'd')) { App->AudioEngineState.CurrentVolume--; }
+        if (input_get_key(input, L'l')) { App->AudioEngineState.IsLooping = !App->AudioEngineState.IsLooping; }
+        if (input_get_key(input, L'a')) { 
             playlist_push(&App->CurrentPlaylist, App->UIState.UICurrentSelectedSongIndex);
         }
 
-        if (App->Renderer.input.keys[L'j']) { 
+        if (input_get_key(input, L'j')) { 
             App->UIState.UICurrentSelectedSongIndex += 1; 
             App->UIState.UICurrentSelectedSongIndex %= App->AudioEngineState.SongsCount;
-            App->Renderer.input.keys[L'j'] = false;
+            input_invalidate_key(input, L'j');
         }
-        if (App->Renderer.input.keys[L'k']) { 
+        if (input_get_key(input, L'k')) { 
             App->UIState.UICurrentSelectedSongIndex -= 1; 
             App->UIState.UICurrentSelectedSongIndex %= App->AudioEngineState.SongsCount;
-            App->Renderer.input.keys[L'k'] = false;
+            input_invalidate_key(input, L'k');
         }
-        if (App->Renderer.input.keys[VK_RETURN]) {
+        if (input_get_key(input, VK_RETURN)) {
             AudioEnginePlaySongAtIndex(&App->AudioEngineState, App->PlatformAudioEngine, App->UIState.UICurrentSelectedSongIndex);
-            App->Renderer.input.keys[VK_RETURN] = false;
+            input_invalidate_key(input, VK_RETURN);
         }
 
     } break;
     case UI_MODE_SEARCH: {
         if (App->UIState.SearchStringCurrentIndex < 16) {
             for (i32 i = 0; i < LH_KEYS_COUNT; ++i) {
-                if (isalpha(i) && App->Renderer.input.keys[i]) {
+                if (isalpha(i) && input_get_key(input, i)) {
                     App->UIState.SearchString[App->UIState.SearchStringCurrentIndex] = (wchar_t)((char)i);
                     App->UIState.SearchStringCurrentIndex++;
-                    App->Renderer.input.keys[i] = false;
+                    input_invalidate_key(input, i);
                     break;
                 }
             }
         }
 
-        if (App->UIState.SearchStringCurrentIndex > 0 && App->Renderer.input.keys[VK_BACK]) {
+        if (App->UIState.SearchStringCurrentIndex > 0 && input_get_key(input, VK_BACK)) {
             App->UIState.SearchString[App->UIState.SearchStringCurrentIndex-1] = L' ';
             App->UIState.SearchStringCurrentIndex--;
-            App->Renderer.input.keys[VK_BACK] = false;
+            input_invalidate_key(input, VK_BACK);
         }
 
     } break;
@@ -689,7 +690,7 @@ void app_update(app* App) {
     }
 
     AudioEngineUpdate(&App->AudioEngineState, App->PlatformAudioEngine);
-    console_render(&App->Renderer);
+    console_render(App->Renderer);
 }
 
 
