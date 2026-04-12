@@ -1,3 +1,6 @@
+#include <windows.h>
+#include <XAUDIO2.h>
+
 #include "audio_engine.h"
 
 #define fourccRIFF 'FFIR'

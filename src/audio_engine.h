@@ -2,8 +2,6 @@
 
 #include "types.h"
 #include <stdio.h>
-#include <windows.h>
-#include <XAUDIO2.h>
 
 #define MAX_BUFFER_COUNT    3
 // @NOTE: More
@@ -13,25 +11,26 @@
 #define AUDIO_ENGINE_MAX_VOLUME         10
 #define AUDIO_ENGINE_MIN_VOLUME         0
 
-struct voice_callback;
+#define AUDIO_ENGINE_FILE_MAX_PATH 256
+
 
 struct song_metadata {
     wchar_t Album[32];
-    wchar_t SongName[MAX_PATH];
-    wchar_t Artist[MAX_PATH];
-    wchar_t FilePath[MAX_PATH];
+    wchar_t SongName[AUDIO_ENGINE_FILE_MAX_PATH];
+    wchar_t Artist[AUDIO_ENGINE_FILE_MAX_PATH];
+    wchar_t FilePath[AUDIO_ENGINE_FILE_MAX_PATH];
     i32     DurationInSec;
 };
 
 struct song_buffer {
-    u8*     Data;
-    u64     BufferSize;
+    u8* Data;
+    u64 BufferSize;
 
-    u16     Channels;
-    u32     SamplesPerSec;
-    u32     NumAvgBytesPerSec;
-    u16     BlockAlign;
-    u16     BitsPerSample;
+    u16 Channels;
+    u32 SamplesPerSec;
+    u32 NumAvgBytesPerSec;
+    u16 BlockAlign;
+    u16 BitsPerSample;
 };
 
 struct song_data {
