@@ -23,6 +23,7 @@
 #define UI_PLAYING         (FOREGROUND_GREEN | FOREGROUND_INTENSITY)
 #define UI_SELECTED_BG     (BACKGROUND_BLUE)
 #define UI_SELECTED        (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | BACKGROUND_BLUE)
+#define UI_SEARCHED        (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | BACKGROUND_RED)
 #define UI_DIM             (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE)
 
 // ------------------------------------------------------------
@@ -177,9 +178,11 @@ void RenderLayout_Library(app* App) {
 
         b32 isPlaying = (SongIndex == AudioEngine->CurrentSongIndex);
         b32 isSelected = (SongIndex == App->UIState.UICurrentSelectedSongIndex);
+        b32 isSearched = (SongIndex == App->UIState.SongsSearchBuffer[App->UIState.CurrentSongSearchBufferIndex]);
 
         if (isPlaying) { attr = UI_PLAYING; }
         if (isSelected) { attr = UI_SELECTED; }
+        if (isSearched) { attr = UI_SEARCHED; }
 
         wchar_t num[8];
         if (isPlaying) { swprintf(num, 9, L"%lc%03d", UI_PLAY, SongIndex + 1); } 
@@ -568,6 +571,33 @@ u8 playlist_removeAt(playlist* Playlist, u32 Index) {
 
 
 
+#define WCHAR_LOWER(x) ((x <= 'Z' && x >= 'A') ? (x-'A'+'a') : (x))
+
+// @NOTE: Change pos
+b32 wstring_starts_with_case_insensitive(const wchar_t* SongName, wchar_t* SearchStr, i32 SearchStrSize) {
+    for (i32 i = 0; i < SearchStrSize; ++i) {
+        if (WCHAR_LOWER(SongName[i]) != WCHAR_LOWER(SearchStr[i])) { return false; }
+    }
+    return true;
+}
+
+
+u8 set_metadata_to_render_from_search_string(ui_state* UIState, const song_data* Songs, const u32 SongsCount) {
+    UIState->SongsSearchBufferCount = 0;
+    UIState->CurrentSongSearchBufferIndex = -1;
+    for (u32 i = 0; i < SongsCount; ++i) {
+        const song_metadata* meta = &(Songs+i)->SongMetadata;
+        if (wstring_starts_with_case_insensitive(meta->SongName, UIState->SearchString, UIState->SearchStringCurrentIndex)) {
+            printf("Found: %ls\n", meta->SongName);
+            UIState->SongsSearchBuffer[UIState->SongsSearchBufferCount++] = i;
+        }
+    }
+
+    if (UIState->SongsSearchBufferCount != 0) { UIState->CurrentSongSearchBufferIndex = 0; }
+
+    return 0;
+}
+
 
 
 
@@ -588,6 +618,11 @@ u8 app_init(app* App) {
     App->UIState.CurrentLayout          = UI_LAYOUT_LIBRARY;
     wcsncpy(App->UIState.SearchString, L"                ", 16);
     App->UIState.SearchStringCurrentIndex = 0;
+
+
+    App->UIState.SongsSearchBuffer = (i32*)malloc(App->AudioEngineState.SongsCount*sizeof(i32));
+    App->UIState.SongsSearchBufferCount = 0;
+    App->UIState.CurrentSongSearchBufferIndex = -1;
 
     playlist_init(&App->CurrentPlaylist, App->AudioEngineState.SongsCount, L"TestPlaylist");
 
@@ -677,6 +712,12 @@ void app_update(app* App) {
             App->UIState.SearchString[App->UIState.SearchStringCurrentIndex-1] = L' ';
             App->UIState.SearchStringCurrentIndex--;
             input_invalidate_key(input, VK_BACK);
+        }
+
+        if (input_get_key(input, L'\r')) {
+            printf("Search: %ls\n", App->UIState.SearchString);
+            set_metadata_to_render_from_search_string(&App->UIState, App->AudioEngineState.Songs, App->AudioEngineState.SongsCount);
+            input_invalidate_key(input, L'\r');
         }
 
     } break;

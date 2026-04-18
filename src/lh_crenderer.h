@@ -87,6 +87,7 @@
   #define FOREGROUND_RED       0x0004 // text color contains red.
   #define FOREGROUND_INTENSITY 0x0008 // text color is intensified.
   #define BACKGROUND_BLUE      0x0010 // background color contains blue.
+  #define BACKGROUND_RED       0x0040 // background color contains red.
   #define VK_BACK           0x08
   #define VK_ESCAPE         0x1B
 #endif

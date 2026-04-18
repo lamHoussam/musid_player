@@ -43,6 +43,9 @@ struct ui_state {
     i64             UIVisualStartIndex;
     i64             UICurrentSelectedSongIndex;
     song_metadata*  MetadataToRenderBuffer;
+    i32*            SongsSearchBuffer;
+    i32             SongsSearchBufferCount;
+    i32             CurrentSongSearchBufferIndex;
     i64             MetadataCount;
     ui_mode         CurrentMode;
     wchar_t         SearchString[16];
