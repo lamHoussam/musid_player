@@ -31,11 +31,15 @@
 enum ui_mode {
     UI_MODE_NORMAL   = 0,
     UI_MODE_SEARCH   = 1,
+
+    __ui_mode_count,
 };
 
 enum ui_layout {
     UI_LAYOUT_LIBRARY   = 0,
     UI_LAYOUT_PLAYLIST  = 1,
+
+    __ui_layout_count,
 };
 
 

@@ -673,12 +673,15 @@ void app_update(app* App) {
 
         }
         if (input_get_key(input, L'p')) { 
-            App->UIState.CurrentSongSearchBufferIndex = (App->UIState.CurrentSongSearchBufferIndex - 1) % App->UIState.SongsSearchBufferCount;
+            App->UIState.CurrentSongSearchBufferIndex = App->UIState.CurrentSongSearchBufferIndex - 1;
+            if (App->UIState.CurrentSongSearchBufferIndex <= 0) {
+                App->UIState.CurrentSongSearchBufferIndex = App->UIState.SongsSearchBufferCount - 1;
+            }
         } 
         if (input_get_key(input, L' ')) { AudioEngineTogglePlayPause(&App->AudioEngineState, App->PlatformAudioEngine); }
         if (input_get_key(input, L'q')) { App->IsRunning = false; }
         if (input_get_key(input, L's')) {
-            App->UIState.CurrentLayout = (ui_layout)((App->UIState.CurrentLayout+1)%2);
+            App->UIState.CurrentLayout = (ui_layout)((App->UIState.CurrentLayout+1)%__ui_layout_count);
         }
         if (input_get_key(input, L'u')) { App->AudioEngineState.CurrentVolume++; }
         if (input_get_key(input, L'd')) { App->AudioEngineState.CurrentVolume--; }
