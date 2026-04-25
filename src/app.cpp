@@ -645,6 +645,81 @@ void app_run(app* App) {
     printf("End of program\n");
 }
 
+u8 command_next(app* App) {
+    App->UIState.CurrentSongSearchBufferIndex = (App->UIState.CurrentSongSearchBufferIndex + 1) % App->UIState.SongsSearchBufferCount;
+    return 0;
+}
+
+u8 command_prev(app* App) {
+    App->UIState.CurrentSongSearchBufferIndex = App->UIState.CurrentSongSearchBufferIndex - 1;
+    if (App->UIState.CurrentSongSearchBufferIndex <= 0) {
+        App->UIState.CurrentSongSearchBufferIndex = App->UIState.SongsSearchBufferCount - 1;
+    }
+    return 0;
+}
+
+u8 command_pause_play(app* App) {
+    return AudioEngineTogglePlayPause(&App->AudioEngineState, App->PlatformAudioEngine);
+}
+
+u8 command_quit(app* App) {
+    App->IsRunning = false;
+    return 0;
+}
+
+u8 command_switch_layout(app* App) {
+    App->UIState.CurrentLayout = (ui_layout)((App->UIState.CurrentLayout+1)%__ui_layout_count);
+    return 0;
+}
+
+u8 command_volume_up(app* App) {
+    App->AudioEngineState.CurrentVolume++;
+    return 0;
+}
+
+u8 command_volume_down(app* App) {
+    App->AudioEngineState.CurrentVolume--;
+    return 0;
+}
+
+u8 command_toggle_loop(app* App) {
+    App->AudioEngineState.IsLooping = !App->AudioEngineState.IsLooping;
+    return 0;
+}
+
+u8 command_move_down(app* App) {
+    App->UIState.UICurrentSelectedSongIndex += 1; 
+    App->UIState.UICurrentSelectedSongIndex %= App->AudioEngineState.SongsCount;
+
+    return 0;
+}
+
+u8 command_move_up(app* App) {
+    App->UIState.UICurrentSelectedSongIndex -= 1; 
+    if (App->UIState.UICurrentSelectedSongIndex <= 0) {
+        App->UIState.UICurrentSelectedSongIndex = App->AudioEngineState.SongsCount - 1;
+    }
+
+    return 0;
+}
+
+u8 command_play_song(app* App) {
+    AudioEnginePlaySongAtIndex(&App->AudioEngineState, App->PlatformAudioEngine, App->UIState.UICurrentSelectedSongIndex);
+
+    return 0;
+}
+
+u8 command_search(app* App) {
+    printf("Search: %ls\n", App->UIState.SearchString);
+    set_metadata_to_render_from_search_string(&App->UIState, App->AudioEngineState.Songs, App->AudioEngineState.SongsCount);
+    App->UIState.CurrentMode = UI_MODE_NORMAL;
+
+    return 0;
+}
+
+
+
+
 
 
 void app_update(app* App) {
@@ -668,44 +743,21 @@ void app_update(app* App) {
     {
     case UI_MODE_NORMAL: {
 
-        if (input_get_key(input, L'n')) { 
-            App->UIState.CurrentSongSearchBufferIndex = (App->UIState.CurrentSongSearchBufferIndex + 1) % App->UIState.SongsSearchBufferCount;
-
-        }
-        if (input_get_key(input, L'p')) { 
-            App->UIState.CurrentSongSearchBufferIndex = App->UIState.CurrentSongSearchBufferIndex - 1;
-            if (App->UIState.CurrentSongSearchBufferIndex <= 0) {
-                App->UIState.CurrentSongSearchBufferIndex = App->UIState.SongsSearchBufferCount - 1;
-            }
-        } 
-        if (input_get_key(input, L' ')) { AudioEngineTogglePlayPause(&App->AudioEngineState, App->PlatformAudioEngine); }
-        if (input_get_key(input, L'q')) { App->IsRunning = false; }
-        if (input_get_key(input, L's')) {
-            App->UIState.CurrentLayout = (ui_layout)((App->UIState.CurrentLayout+1)%__ui_layout_count);
-        }
-        if (input_get_key(input, L'u')) { App->AudioEngineState.CurrentVolume++; }
-        if (input_get_key(input, L'd')) { App->AudioEngineState.CurrentVolume--; }
-        if (input_get_key(input, L'l')) { App->AudioEngineState.IsLooping = !App->AudioEngineState.IsLooping; }
+        if (input_get_key(input, L'n')) { command_next(App); }
+        if (input_get_key(input, L'p')) { command_prev(App); } 
+        if (input_get_key(input, L' ')) { command_pause_play(App); }
+        if (input_get_key(input, L'q')) { command_quit(App); }
+        if (input_get_key(input, L's')) { command_switch_layout(App); }
+        if (input_get_key(input, L'u')) { command_volume_up(App); }
+        if (input_get_key(input, L'd')) { command_volume_down(App); }
+        if (input_get_key(input, L'l')) { command_toggle_loop(App); }
         if (input_get_key(input, L'a')) { 
             playlist_push(&App->CurrentPlaylist, App->UIState.UICurrentSelectedSongIndex);
         }
 
-        if (input_get_key(input, L'j')) { 
-            App->UIState.UICurrentSelectedSongIndex += 1; 
-            App->UIState.UICurrentSelectedSongIndex %= App->AudioEngineState.SongsCount;
-            input_invalidate_key(input, L'j');
-        }
-        if (input_get_key(input, L'k')) { 
-            App->UIState.UICurrentSelectedSongIndex -= 1; 
-            if (App->UIState.UICurrentSelectedSongIndex <= 0) {
-                App->UIState.UICurrentSelectedSongIndex = App->AudioEngineState.SongsCount - 1;
-            }
-            input_invalidate_key(input, L'k');
-        }
-        if (input_get_key(input, L'\r')) {
-            AudioEnginePlaySongAtIndex(&App->AudioEngineState, App->PlatformAudioEngine, App->UIState.UICurrentSelectedSongIndex);
-            input_invalidate_key(input, L'\r');
-        }
+        if (input_get_key(input, L'j')) { command_move_down(App); }
+        if (input_get_key(input, L'k')) { command_move_up(App); }
+        if (input_get_key(input, L'\r')) { command_play_song(App); }
 
     } break;
     case UI_MODE_SEARCH: {
@@ -726,12 +778,7 @@ void app_update(app* App) {
             input_invalidate_key(input, VK_BACK);
         }
 
-        if (input_get_key(input, L'\r')) {
-            printf("Search: %ls\n", App->UIState.SearchString);
-            set_metadata_to_render_from_search_string(&App->UIState, App->AudioEngineState.Songs, App->AudioEngineState.SongsCount);
-            input_invalidate_key(input, L'\r');
-            App->UIState.CurrentMode = UI_MODE_NORMAL;
-        }
+        if (input_get_key(input, L'\r')) { command_search(App); }
 
     } break;
     }
