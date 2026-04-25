@@ -645,6 +645,8 @@ void app_run(app* App) {
     printf("End of program\n");
 }
 
+
+
 void app_update(app* App) {
     ConsoleRenderer* console = App->Renderer;
     InputState* input        = console_get_input_state(console);
@@ -666,8 +668,13 @@ void app_update(app* App) {
     {
     case UI_MODE_NORMAL: {
 
-        if (input_get_key(input, L'n')) { AudioEnginePlayNext(&App->AudioEngineState, App->PlatformAudioEngine); }
-        if (input_get_key(input, L'p')) { AudioEnginePlayPrev(&App->AudioEngineState, App->PlatformAudioEngine); }
+        if (input_get_key(input, L'n')) { 
+            App->UIState.CurrentSongSearchBufferIndex = (App->UIState.CurrentSongSearchBufferIndex + 1) % App->UIState.SongsSearchBufferCount;
+
+        }
+        if (input_get_key(input, L'p')) { 
+            App->UIState.CurrentSongSearchBufferIndex = (App->UIState.CurrentSongSearchBufferIndex - 1) % App->UIState.SongsSearchBufferCount;
+        } 
         if (input_get_key(input, L' ')) { AudioEngineTogglePlayPause(&App->AudioEngineState, App->PlatformAudioEngine); }
         if (input_get_key(input, L'q')) { App->IsRunning = false; }
         if (input_get_key(input, L's')) {
@@ -687,7 +694,9 @@ void app_update(app* App) {
         }
         if (input_get_key(input, L'k')) { 
             App->UIState.UICurrentSelectedSongIndex -= 1; 
-            App->UIState.UICurrentSelectedSongIndex %= App->AudioEngineState.SongsCount;
+            if (App->UIState.UICurrentSelectedSongIndex <= 0) {
+                App->UIState.UICurrentSelectedSongIndex = App->AudioEngineState.SongsCount - 1;
+            }
             input_invalidate_key(input, L'k');
         }
         if (input_get_key(input, L'\r')) {
@@ -718,6 +727,7 @@ void app_update(app* App) {
             printf("Search: %ls\n", App->UIState.SearchString);
             set_metadata_to_render_from_search_string(&App->UIState, App->AudioEngineState.Songs, App->AudioEngineState.SongsCount);
             input_invalidate_key(input, L'\r');
+            App->UIState.CurrentMode = UI_MODE_NORMAL;
         }
 
     } break;
